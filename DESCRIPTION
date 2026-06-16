@@ -1,6 +1,6 @@
 Package: woven
 Title: Weighted Omics View Embedding via Nystrom for Incomplete Multi-Omics Data
-Version: 0.1.0
+Version: 0.99.0
 Authors@R: c(
     person("Nathan", "Bresette",
            role = c("aut", "cre"),
@@ -11,8 +11,6 @@ Authors@R: c(
     person("Jianlin", "Cheng",
            role = "aut")
   )
-Author: Nathan Bresette [aut, cre], Ai-Ling Lin [aut], Jianlin Cheng [aut]
-Maintainer: Nathan Bresette <nathanbresette04@gmail.com>
 Description: Supervised multi-omics integration for block-missing ("ragged") data.
     WOVEN learns a shared latent space across V omics modalities using only
     fully-observed anchor subjects, then projects block-missing subjects via
@@ -23,6 +21,11 @@ Description: Supervised multi-omics integration for block-missing ("ragged") dat
 License: MIT + file LICENSE
 Encoding: UTF-8
 RoxygenNote: 7.3.3
+URL: https://github.com/nbhtd/woven
+BugReports: https://github.com/nbhtd/woven/issues
+biocViews: Software, StatisticalMethod, MultipleComparison, GeneExpression,
+    Transcriptomics, Proteomics, Metabolomics, MultiOmicsData, DimensionReduction,
+    Clustering, Classification, Sequencing
 Depends:
     R (>= 4.1.0)
 Imports:
@@ -33,5 +36,9 @@ Imports:
 Suggests:
     testthat (>= 3.0.0),
     mixOmics,
-    MASS
+    MASS,
+    BiocStyle,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
 Config/testthat/edition: 3
