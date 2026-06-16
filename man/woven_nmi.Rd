@@ -22,3 +22,9 @@ scalar in [0, 1], higher is better
 Uses k-means on Z to get cluster assignments, then computes NMI.
 k-means run 10 times to reduce initialization variance.
 }
+\examples{
+set.seed(1)
+Z <- matrix(rnorm(60 * 3), 60, 3)
+labels <- rep(1:3, each = 20)
+woven_nmi(Z, labels)
+}

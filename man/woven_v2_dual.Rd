@@ -53,3 +53,16 @@ list with same fields as woven_v2: W1, W2, Z1, Z2, Za1, Za2,
 Exact dual of woven_v2: all matrix operations are n_a x n_a instead of p x p.
 Requires L_list_precomp (sample Laplacians); anchor-only B computed internally.
 }
+\examples{
+# minimal example data (n=20, 14 anchors, 6 partial)
+set.seed(1); n <- 20; K <- 2L
+X1 <- matrix(rnorm(n*5), n, 5); X2 <- matrix(rnorm(n*4), n, 4)
+Y  <- rep(1:2, each = n/2)
+# Rows 15-20: alternate missing view 1 or view 2 (never both)
+miss <- matrix(FALSE, n, 2)
+miss[c(15,17,19), 1] <- TRUE   # miss view 1
+miss[c(16,18,20), 2] <- TRUE   # miss view 2
+X1[miss[,1],] <- NA; X2[miss[,2],] <- NA
+anchor_idx <- which(rowSums(miss)==0)
+woven_v2_dual(X1,X2,anchor_idx=anchor_idx,Y=as.integer(as.factor(Y)),K=K)
+}

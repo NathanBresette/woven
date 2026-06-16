@@ -29,3 +29,14 @@ treatment effect to the known true effect (from simulation ground truth).
 bias_g = |estimated_g - true_g| / |true_g|   (relative)
 Returns mean bias across subgroups.
 }
+\examples{
+\donttest{
+set.seed(1); n <- 60
+Z         <- matrix(rnorm(n*3), n, 3)
+outcome   <- rnorm(n)
+treatment <- rep(0:1, n/2)
+labels    <- rep(1:2, each=n/2)
+true_eff  <- c("1"=0.5, "2"=1.0)
+woven_effect_bias(Z, outcome, treatment, labels, true_eff)
+}
+}

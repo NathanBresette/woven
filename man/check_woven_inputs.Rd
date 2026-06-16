@@ -17,3 +17,8 @@ check_woven_inputs(X_list, anchor_idx, K)
 Validate inputs before solve
 }
 \keyword{internal}
+\value{
+  Called for its side effects. Throws an error if inputs are invalid;
+  emits a warning if the anchor set is small relative to K.
+  Returns NULL invisibly.
+}

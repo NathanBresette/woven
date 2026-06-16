@@ -17,3 +17,9 @@ scalar in [-1, 1], higher is better
 \description{
 Average silhouette width
 }
+\examples{
+set.seed(1)
+Z <- matrix(rnorm(60 * 3), 60, 3)
+labels <- rep(1:3, each = 20)
+woven_silhouette(Z, labels)
+}

@@ -17,3 +17,6 @@ scalar in [0, 1], higher is better (DIABLO structurally caps at overlap fraction
 \description{
 Effective sample size retention
 }
+\examples{
+woven_ess_retention(n_used = 60, n_total = 80)
+}

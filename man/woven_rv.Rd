@@ -18,3 +18,9 @@ scalar in [0, 1], higher is better
 RV(X, Y) = trace(X X' Y Y') / sqrt(trace(X X' X X') * trace(Y Y' Y Y'))
 Measures similarity of two cross-product matrices; 1 = identical subspace.
 }
+\examples{
+set.seed(1)
+Z     <- matrix(rnorm(60*3), 60, 3)
+Z_ref <- Z + matrix(rnorm(60*3, sd=0.1), 60, 3)
+woven_rv(Z, Z_true = Z_ref)
+}

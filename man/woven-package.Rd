@@ -18,3 +18,6 @@ Authors:
 
 }
 \keyword{internal}
+\examples{
+packageVersion("woven")
+}

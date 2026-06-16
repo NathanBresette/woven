@@ -18,3 +18,9 @@ scalar >= 0, lower is better
 DB = (1/K) sum_i max_\{j != i\} (s_i + s_j) / d(c_i, c_j)
 where s_i = mean intra-cluster distance, d(c_i, c_j) = centroid distance.
 }
+\examples{
+set.seed(1)
+Z <- matrix(rnorm(60 * 3), 60, 3)
+labels <- rep(1:3, each = 20)
+woven_davies_bouldin(Z, labels)
+}

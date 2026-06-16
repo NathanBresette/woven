@@ -24,11 +24,12 @@ RoxygenNote: 7.3.3
 URL: https://github.com/NathanBresette/woven
 BugReports: https://github.com/NathanBresette/woven/issues
 biocViews: Software, StatisticalMethod, MultipleComparison, GeneExpression,
-    Transcriptomics, Proteomics, Metabolomics, MultiOmicsData, DimensionReduction,
+    Transcriptomics, Proteomics, Metabolomics, DimensionReduction,
     Clustering, Classification, Sequencing
 Depends:
-    R (>= 4.1.0)
+    R (>= 4.5.0)
 Imports:
+    graphics,
     Matrix,
     RANN,
     RSpectra,

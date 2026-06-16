@@ -74,7 +74,7 @@ For V=2, uses the closed-form supervised CCA solver (fast, exact).
 For V>=3, uses the ALS solver with label-kernel supervision.
 }
 \examples{
-\dontrun{
+\donttest{
 fit  <- woven(list(X1, X2), Y = group_labels, anchor_idx = complete_cases)
 proj <- woven_project(fit$fit_v2, X1, X2)
 pred <- woven_predict(fit, list(X1_new, X2_new))

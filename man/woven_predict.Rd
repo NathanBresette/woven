@@ -28,3 +28,17 @@ Projects new subjects into the WOVEN latent space and returns soft class
 assignments using a nearest-centroid classifier in latent space. Works for
 complete subjects (direct projection) and block-missing subjects (Nystrm).
 }
+\examples{
+# minimal example data (n=20, 14 anchors, 6 partial)
+set.seed(1); n <- 20; K <- 2L
+X1 <- matrix(rnorm(n*5), n, 5); X2 <- matrix(rnorm(n*4), n, 4)
+Y  <- rep(1:2, each = n/2)
+# Rows 15-20: alternate missing view 1 or view 2 (never both)
+miss <- matrix(FALSE, n, 2)
+miss[c(15,17,19), 1] <- TRUE   # miss view 1
+miss[c(16,18,20), 2] <- TRUE   # miss view 2
+X1[miss[,1],] <- NA; X2[miss[,2],] <- NA
+anchor_idx <- which(rowSums(miss)==0)
+fit <- woven(list(X1,X2),Y=Y,anchor_idx=anchor_idx,K=K)
+woven_predict(fit, list(X1[1:5,],X2[1:5,]))
+}
