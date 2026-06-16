@@ -1,0 +1,21 @@
+\begin{table}[ht]
+\centering
+\caption{ADNI real-data validation (V=3: MRI FreeSurfer + plasma lipidomics + NMR metabolomics; n=2{,}422 baseline subjects with known diagnosis). ESS = fraction of subjects with at least one latent score. BER via 5-fold stratified LDA on fixed latent representation; chance = 0.667 (3-class). The 944 WOVEN-only subjects have twice the Dementia rate of the DIABLO-retained group.}
+\label{tab:adni}
+\begin{tabular}{lrrrrrr}
+\toprule
+Method & N scored & ESS & Silhouette & NMI & BER \\
+\midrule
+GRAMA & 1687 & 70\% & 0.174 & 0.114 & 0.398 \\
+DIABLO & 743 & 31\% & -0.018 & 0.015 & 0.541 \\
+\midrule
+\multicolumn{6}{l}{\textit{Diagnosis composition by subject group}} \\
+\midrule
+Group & N & & CN & MCI & Dementia \\
+\midrule
+DIABLO retained & 743 & & 34\% & 54\% & 12\% \\
+GRAMA-only (recovered) & 944 & & 28\% & 47\% & 25\% \\
+Neither (no data) & 735 & & 53\% & 36\% & 11\% \\
+\bottomrule
+\end{tabular}
+\end{table}

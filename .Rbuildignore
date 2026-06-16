@@ -1,0 +1,7 @@
+^\.\..Rcheck$
+^\.\.Rcheck$
+^data-raw$
+^scripts$
+^slurm$
+^figures$
+^results$
