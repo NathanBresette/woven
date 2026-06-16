@@ -20,7 +20,7 @@ Measures similarity of two cross-product matrices; 1 = identical subspace.
 }
 \examples{
 set.seed(1)
-Z     <- matrix(rnorm(60*3), 60, 3)
-Z_ref <- Z + matrix(rnorm(60*3, sd=0.1), 60, 3)
-woven_rv(Z, Z_true = Z_ref)
+Z <- matrix(rnorm(20 * 2), 20, 2)
+Z_true <- matrix(rnorm(20 * 3), 20, 3)
+woven_rv(Z, Z_true)
 }

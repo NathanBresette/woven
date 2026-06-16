@@ -3,9 +3,17 @@
 \docType{package}
 \name{woven-package}
 \alias{woven-package}
-\title{woven: Graph-Regularized Anchor Multi-View Alignment for Incomplete Multi-Omics Data}
+\title{woven: Weighted Omics View Embedding via Nystrom for Incomplete Multi-Omics Data}
 \description{
 Supervised multi-omics integration for block-missing ("ragged") data. WOVEN learns a shared latent space across V omics modalities using only fully-observed anchor subjects, then projects block-missing subjects via Nystrom extension without feature-level imputation. Supervision via label-augmented cross-covariance (analogous to DIABLO) with optional sparse projection matrices (PMD). Designed for comparative effectiveness research where intersection-only methods introduce selection bias.
+}
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/NathanBresette/woven}
+  \item Report bugs at \url{https://github.com/NathanBresette/woven/issues}
+}
+
 }
 \author{
 \strong{Maintainer}: Nathan Bresette \email{nathanbresette04@gmail.com}
@@ -18,6 +26,3 @@ Authors:
 
 }
 \keyword{internal}
-\examples{
-packageVersion("woven")
-}

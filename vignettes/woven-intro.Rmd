@@ -14,10 +14,10 @@ vignette: >
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment  = "#>",
-  fig.width = 7,
-  fig.height = 5
+    collapse = TRUE,
+    comment = "#>",
+    fig.width = 7,
+    fig.height = 5
 )
 ```
 
@@ -46,8 +46,9 @@ No feature-level imputation is performed at any stage.
 # Installation
 
 ```{r install, eval=FALSE}
-if (!requireNamespace("BiocManager", quietly = TRUE))
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
     install.packages("BiocManager")
+}
 BiocManager::install("woven")
 ```
 
@@ -59,11 +60,11 @@ BiocManager::install("woven")
 library(woven)
 set.seed(42)
 
-n  <- 120   # total subjects
-p1 <- 200   # modality 1 features (e.g. RNA-seq)
-p2 <- 80    # modality 2 features (e.g. methylation)
-p3 <- 30    # modality 3 features (e.g. proteomics)
-K  <- 3     # latent dimensions
+n <- 120 # total subjects
+p1 <- 200 # modality 1 features (e.g. RNA-seq)
+p2 <- 80 # modality 2 features (e.g. methylation)
+p3 <- 30 # modality 3 features (e.g. proteomics)
+K <- 3 # latent dimensions
 n_groups <- 3
 
 # True group labels
@@ -71,11 +72,12 @@ labels <- rep(1:n_groups, each = n / n_groups)
 
 # Simulate group-discriminative signal in each modality
 make_view <- function(p, labels, signal = 2) {
-  n <- length(labels)
-  X <- matrix(rnorm(n * p), n, p)
-  for (g in unique(labels))
-    X[labels == g, 1:5] <- X[labels == g, 1:5] + signal
-  X
+    n <- length(labels)
+    X <- matrix(rnorm(n * p), n, p)
+    for (g in unique(labels)) {
+        X[labels == g, 1:5] <- X[labels == g, 1:5] + signal
+    }
+    X
 }
 
 X1 <- make_view(p1, labels)
@@ -99,14 +101,16 @@ for (i in all_miss) miss_mask[i, sample(V, 1)] <- FALSE
 
 # Anchor subjects: fully observed
 anchor_idx <- which(rowSums(miss_mask) == 0L)
-cat(sprintf("Anchors: %d / %d (%.0f%%)\n",
-    length(anchor_idx), n, 100 * length(anchor_idx) / n))
+cat(sprintf(
+    "Anchors: %d / %d (%.0f%%)\n",
+    length(anchor_idx), n, 100 * length(anchor_idx) / n
+))
 
 # Apply missingness
 X_miss <- lapply(seq_len(V), function(v) {
-  Xv <- X_list[[v]]
-  Xv[miss_mask[, v], ] <- NA_real_
-  Xv
+    Xv <- X_list[[v]]
+    Xv[miss_mask[, v], ] <- NA_real_
+    Xv
 })
 names(X_miss) <- names(X_list)
 ```
@@ -115,16 +119,16 @@ names(X_miss) <- names(X_list)
 
 ```{r fit}
 fit <- woven(
-  X_list     = X_miss,
-  Y          = labels,
-  anchor_idx = anchor_idx,
-  K          = K,
-  lambdas    = 0.01,   # graph Laplacian regularization
-  gamma_y    = 5.0,    # label supervision strength
-  k_nn       = 10L     # k-NN graph for Laplacian
+    X_list     = X_miss,
+    Y          = labels,
+    anchor_idx = anchor_idx,
+    K          = K,
+    lambdas    = 0.01, # graph Laplacian regularization
+    gamma_y    = 5.0, # label supervision strength
+    k_nn       = 10L # k-NN graph for Laplacian
 )
 
-fit  # print summary
+fit # print summary
 ```
 
 ## Inspect the latent space
@@ -133,8 +137,10 @@ fit  # print summary
 including the block-missing ones. No subject is dropped.
 
 ```{r plot, fig.cap="WOVEN latent space. Filled points are anchor subjects (complete cases); open circles are block-missing subjects projected from their available views. Colors indicate true group membership."}
-plot(fit, labels = labels,
-     main = sprintf("WOVEN latent space — %d/%d subjects scored", n, n))
+plot(fit,
+    labels = labels,
+    main = sprintf("WOVEN latent space — %d/%d subjects scored", n, n)
+)
 ```
 
 ## Score new subjects
@@ -147,11 +153,11 @@ returns an n_new x K matrix directly.
 set.seed(99)
 X_new <- lapply(X_list, function(Xv) Xv[1:20, ])
 miss_new <- matrix(runif(20 * V) < 0.4, 20, V)
-for (i in 1:20) if (all(miss_new[i,])) miss_new[i, sample(V,1)] <- FALSE
+for (i in 1:20) if (all(miss_new[i, ])) miss_new[i, sample(V, 1)] <- FALSE
 for (v in seq_len(V)) X_new[[v]][miss_new[, v], ] <- NA_real_
 
 Z_new <- woven_scores(fit, X_new)
-dim(Z_new)   # 20 x K
+dim(Z_new) # 20 x K
 ```
 
 ## Predict classes for new subjects
@@ -184,11 +190,11 @@ size (ESS): DIABLO discards every subject missing any modality, while WOVEN
 retains all subjects with at least one observed view.
 
 ```{r ess}
-n_diablo <- length(anchor_idx)       # DIABLO can only score complete cases
-n_woven  <- sum(!is.na(fit$Z[,1]))  # WOVEN scores all subjects with >= 1 view
+n_diablo <- length(anchor_idx) # DIABLO can only score complete cases
+n_woven <- sum(!is.na(fit$Z[, 1])) # WOVEN scores all subjects with >= 1 view
 
-cat(sprintf("DIABLO ESS: %d / %d (%.0f%%)\n", n_diablo, n, 100*n_diablo/n))
-cat(sprintf("WOVEN  ESS: %d / %d (%.0f%%)\n", n_woven,  n, 100*n_woven/n))
+cat(sprintf("DIABLO ESS: %d / %d (%.0f%%)\n", n_diablo, n, 100 * n_diablo / n))
+cat(sprintf("WOVEN  ESS: %d / %d (%.0f%%)\n", n_woven, n, 100 * n_woven / n))
 ```
 
 # Session Info

@@ -16,14 +16,13 @@ list of V VIP vectors, one per modality
 VIP scores for a fitted ALS model
 }
 \examples{
-set.seed(1); n <- 20; K <- 2L
-X1 <- matrix(rnorm(n*5), n, 5); X2 <- matrix(rnorm(n*4), n, 4)
-Y  <- rep(1:2, each=n/2)
-miss <- matrix(FALSE, n, 2)
-miss[c(15,17,19),1] <- TRUE; miss[c(16,18,20),2] <- TRUE
-X1[miss[,1],] <- NA; X2[miss[,2],] <- NA
-anchor_idx <- which(rowSums(miss)==0)
-fit_als <- woven_als(list(X1,X2), anchor_idx=anchor_idx,
-                     Y=as.integer(as.factor(Y)), K=K, max_iter=20L)
-woven_als_vip(fit_als)
+set.seed(1)
+n <- 20
+K <- 2L
+X1 <- matrix(rnorm(n * 5), n, 5)
+X2 <- matrix(rnorm(n * 4), n, 4)
+X3 <- matrix(rnorm(n * 3), n, 3)
+Y <- rep(1:2, each = n / 2)
+fit <- woven_als(list(X1, X2, X3), anchor_idx = seq_len(14L), Y = Y, K = K)
+woven_als_vip(fit)
 }

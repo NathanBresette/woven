@@ -20,7 +20,7 @@ where s_i = mean intra-cluster distance, d(c_i, c_j) = centroid distance.
 }
 \examples{
 set.seed(1)
-Z <- matrix(rnorm(60 * 3), 60, 3)
-labels <- rep(1:3, each = 20)
+Z <- matrix(rnorm(20 * 2), 20, 2)
+labels <- rep(1:2, each = 10)
 woven_davies_bouldin(Z, labels)
 }

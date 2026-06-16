@@ -13,12 +13,10 @@ check_woven_inputs(X_list, anchor_idx, K)
 
 \item{K}{number of latent dimensions}
 }
+\value{
+Invisibly returns TRUE if all checks pass; stops with an error otherwise.
+}
 \description{
 Validate inputs before solve
 }
 \keyword{internal}
-\value{
-  Called for its side effects. Throws an error if inputs are invalid;
-  emits a warning if the anchor set is small relative to K.
-  Returns NULL invisibly.
-}

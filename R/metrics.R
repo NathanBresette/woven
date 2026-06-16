@@ -13,23 +13,30 @@
 #   woven_nystrom_error    -- leave-anchor-out Nystrm projection error
 #   woven_all_metrics      -- compute full battery, returns named list
 
-#  Silhouette 
+#  Silhouette
 
 #' Average silhouette width
 #'
 #' @param Z numeric matrix n x K (latent scores)
 #' @param labels integer or factor of length n (subgroup labels)
 #' @return scalar in [-1, 1], higher is better
+#' @examples
+#' set.seed(1)
+#' Z <- matrix(rnorm(20 * 2), 20, 2)
+#' labels <- rep(1:2, each = 10)
+#' woven_silhouette(Z, labels)
 #' @export
 woven_silhouette <- function(Z, labels) {
-  labels <- as.integer(as.factor(labels))
-  if (length(unique(labels)) < 2L) return(NA_real_)
-  d  <- dist(Z)
-  sw <- cluster::silhouette(labels, d)
-  mean(sw[, "sil_width"])
+    labels <- as.integer(as.factor(labels))
+    if (length(unique(labels)) < 2L) {
+        return(NA_real_)
+    }
+    d <- dist(Z)
+    sw <- cluster::silhouette(labels, d)
+    mean(sw[, "sil_width"])
 }
 
-#  Davies-Bouldin 
+#  Davies-Bouldin
 
 #' Davies-Bouldin index
 #'
@@ -39,35 +46,46 @@ woven_silhouette <- function(Z, labels) {
 #' @param Z numeric matrix n x K
 #' @param labels integer or factor of length n
 #' @return scalar >= 0, lower is better
+#' @examples
+#' set.seed(1)
+#' Z <- matrix(rnorm(20 * 2), 20, 2)
+#' labels <- rep(1:2, each = 10)
+#' woven_davies_bouldin(Z, labels)
 #' @export
 woven_davies_bouldin <- function(Z, labels) {
-  labels <- as.integer(as.factor(labels))
-  K_cl   <- length(unique(labels))
-  if (K_cl < 2L) return(NA_real_)
+    labels <- as.integer(as.factor(labels))
+    K_cl <- length(unique(labels))
+    if (K_cl < 2L) {
+        return(NA_real_)
+    }
 
-  centroids <- do.call(rbind, lapply(sort(unique(labels)), function(g) {
-    colMeans(Z[labels == g, , drop = FALSE])
-  }))
-
-  s <- sapply(sort(unique(labels)), function(g) {
-    Zg <- Z[labels == g, , drop = FALSE]
-    if (nrow(Zg) < 2L) return(0)
-    mean(sqrt(rowSums(sweep(Zg, 2, centroids[g, ])^2)))
-  })
-
-  db_vals <- sapply(seq_len(K_cl), function(i) {
-    others <- setdiff(seq_len(K_cl), i)
-    max(sapply(others, function(j) {
-      d_ij <- sqrt(sum((centroids[i, ] - centroids[j, ])^2))
-      if (d_ij < 1e-12) return(0)
-      (s[i] + s[j]) / d_ij
+    centroids <- do.call(rbind, lapply(sort(unique(labels)), function(g) {
+        colMeans(Z[labels == g, , drop = FALSE])
     }))
-  })
 
-  mean(db_vals)
+    s <- vapply(sort(unique(labels)), function(g) {
+        Zg <- Z[labels == g, , drop = FALSE]
+        if (nrow(Zg) < 2L) {
+            return(0)
+        }
+        mean(sqrt(rowSums(sweep(Zg, 2, centroids[g, ])^2)))
+    }, numeric(1L))
+
+    db_vals <- vapply(seq_len(K_cl), function(i) {
+        others <- setdiff(seq_len(K_cl), i)
+        max(vapply(others, function(j) {
+            d_ij <- sqrt(sum((centroids[i, ] - centroids[j, ])^2))
+            if (d_ij < 1e-12) {
+                return(0)
+            }
+            (s[i] + s[j]) / d_ij
+        }, numeric(1L)))
+    }, numeric(1L))
+
+    mean(db_vals)
 }
 
-#  NMI 
+#  NMI
 
 #' Normalized mutual information between cluster assignments and true labels
 #'
@@ -79,40 +97,49 @@ woven_davies_bouldin <- function(Z, labels) {
 #' @param n_cl integer, number of clusters (default = number of unique labels)
 #' @param n_start integer, k-means random starts
 #' @return scalar in [0, 1], higher is better
+#' @examples
+#' set.seed(1)
+#' Z <- matrix(rnorm(40 * 2), 40, 2)
+#' labels <- rep(1:2, each = 20)
+#' woven_nmi(Z, labels)
 #' @export
 woven_nmi <- function(Z, labels, n_cl = NULL, n_start = 10L) {
-  labels <- as.integer(as.factor(labels))
-  if (is.null(n_cl)) n_cl <- length(unique(labels))
-  if (n_cl < 2L) return(NA_real_)
+    labels <- as.integer(as.factor(labels))
+    if (is.null(n_cl)) n_cl <- length(unique(labels))
+    if (n_cl < 2L) {
+        return(NA_real_)
+    }
 
-  km  <- kmeans(Z, centers = n_cl, nstart = n_start, iter.max = 100L)
-  pred <- km$cluster
+    km <- kmeans(Z, centers = n_cl, nstart = n_start, iter.max = 100L)
+    pred <- km$cluster
 
-  # NMI via entropy decomposition (no external package needed)
-  .entropy <- function(x) {
-    px <- tabulate(x) / length(x)
-    px <- px[px > 0]
-    -sum(px * log(px))
-  }
-  .joint_entropy <- function(x, y) {
-    n <- length(x)
-    tbl <- table(x, y)
-    pxy <- tbl / n
-    pxy <- pxy[pxy > 0]
-    -sum(pxy * log(pxy))
-  }
+    # NMI via entropy decomposition (no external package needed)
+    .entropy <- function(x) {
+        px <- tabulate(x) / length(x)
+        px <- px[px > 0]
+        -sum(px * log(px))
+    }
+    .joint_entropy <- function(x, y) {
+        n <- length(x)
+        tbl <- table(x, y)
+        pxy <- tbl / n
+        pxy <- pxy[pxy > 0]
+        -sum(pxy * log(pxy))
+    }
 
-  H_true <- .entropy(labels)
-  H_pred <- .entropy(pred)
-  H_joint <- .joint_entropy(labels, pred)
-  MI <- H_true + H_pred - H_joint
+    H_true <- .entropy(labels)
+    H_pred <- .entropy(pred)
+    H_joint <- .joint_entropy(labels, pred)
+    MI <- H_true + H_pred - H_joint
 
-  denom <- (H_true + H_pred) / 2
-  if (denom < 1e-12) return(NA_real_)
-  MI / denom
+    denom <- (H_true + H_pred) / 2
+    if (denom < 1e-12) {
+        return(NA_real_)
+    }
+    MI / denom
 }
 
-#  RV coefficient 
+#  RV coefficient
 
 #' RV coefficient between latent scores and ground-truth factor matrix
 #'
@@ -122,36 +149,45 @@ woven_nmi <- function(Z, labels, n_cl = NULL, n_start = 10L) {
 #' @param Z numeric matrix n x K (inferred latent scores)
 #' @param Z_true numeric matrix n x K_true (ground-truth factor scores from SUMO)
 #' @return scalar in [0, 1], higher is better
+#' @examples
+#' set.seed(1)
+#' Z <- matrix(rnorm(20 * 2), 20, 2)
+#' Z_true <- matrix(rnorm(20 * 3), 20, 3)
+#' woven_rv(Z, Z_true)
 #' @export
 woven_rv <- function(Z, Z_true) {
-  stopifnot(nrow(Z) == nrow(Z_true))
-  # Center columns
-  Z      <- scale(Z,      center = TRUE, scale = FALSE)
-  Z_true <- scale(Z_true, center = TRUE, scale = FALSE)
+    stopifnot(nrow(Z) == nrow(Z_true))
+    # Center columns
+    Z <- scale(Z, center = TRUE, scale = FALSE)
+    Z_true <- scale(Z_true, center = TRUE, scale = FALSE)
 
-  S  <- tcrossprod(Z)        # n x n
-  T_ <- tcrossprod(Z_true)   # n x n
+    S <- tcrossprod(Z) # n x n
+    T_ <- tcrossprod(Z_true) # n x n
 
-  num   <- sum(S * T_)
-  denom <- sqrt(sum(S * S) * sum(T_ * T_))
-  if (denom < 1e-12) return(NA_real_)
-  num / denom
+    num <- sum(S * T_)
+    denom <- sqrt(sum(S * S) * sum(T_ * T_))
+    if (denom < 1e-12) {
+        return(NA_real_)
+    }
+    num / denom
 }
 
-#  Effective sample size retention 
+#  Effective sample size retention
 
 #' Effective sample size retention
 #'
 #' @param n_used integer, number of subjects with a latent score
 #' @param n_total integer, total subjects in dataset
 #' @return scalar in [0, 1], higher is better (DIABLO structurally caps at overlap fraction)
+#' @examples
+#' woven_ess_retention(n_used = 80, n_total = 100)
 #' @export
 woven_ess_retention <- function(n_used, n_total) {
-  stopifnot(n_used >= 0, n_total > 0, n_used <= n_total)
-  n_used / n_total
+    stopifnot(n_used >= 0, n_total > 0, n_used <= n_total)
+    n_used / n_total
 }
 
-#  Subgroup effect estimate bias 
+#  Subgroup effect estimate bias
 
 #' CER-specific: subgroup effect estimate bias
 #'
@@ -168,31 +204,46 @@ woven_ess_retention <- function(n_used, n_total) {
 #' @param labels integer or factor of length n (subgroup labels)
 #' @param true_effects named numeric vector, true treatment effect per subgroup level
 #' @return scalar >= 0, lower is better
+#' @examples
+#' set.seed(1)
+#' n <- 60
+#' Z <- matrix(rnorm(n * 3), n, 3)
+#' outcome <- rnorm(n)
+#' treatment <- rep(0:1, n / 2)
+#' labels <- rep(1:2, each = n / 2)
+#' true_eff <- c(0.5, 1.0)
+#' woven_effect_bias(Z, outcome, treatment, labels, true_eff)
 #' @export
 woven_effect_bias <- function(Z, outcome, treatment, labels, true_effects) {
-  labels    <- as.integer(as.factor(labels))
-  treatment <- as.numeric(treatment)
-  groups    <- sort(unique(labels))
+    labels <- as.integer(as.factor(labels))
+    treatment <- as.numeric(treatment)
+    groups <- sort(unique(labels))
 
-  biases <- vapply(seq_along(groups), function(gi) {
-    g   <- groups[gi]
-    idx <- which(labels == g)
-    if (length(idx) < 5L) return(NA_real_)
+    biases <- vapply(seq_along(groups), function(gi) {
+        g <- groups[gi]
+        idx <- which(labels == g)
+        if (length(idx) < 5L) {
+            return(NA_real_)
+        }
 
-    df  <- data.frame(y = outcome[idx], trt = treatment[idx], Z[idx, , drop = FALSE])
-    fit <- tryCatch(lm(y ~ ., data = df), error = function(e) NULL)
-    if (is.null(fit)) return(NA_real_)
+        df <- data.frame(y = outcome[idx], trt = treatment[idx], Z[idx, , drop = FALSE])
+        fit <- tryCatch(lm(y ~ ., data = df), error = function(e) NULL)
+        if (is.null(fit)) {
+            return(NA_real_)
+        }
 
-    est  <- coef(fit)["trt"]
-    true <- true_effects[gi]
-    if (is.na(true) || abs(true) < 1e-12) return(NA_real_)
-    abs(est - true) / abs(true)
-  }, numeric(1L))
+        est <- coef(fit)["trt"]
+        true <- true_effects[gi]
+        if (is.na(true) || abs(true) < 1e-12) {
+            return(NA_real_)
+        }
+        abs(est - true) / abs(true)
+    }, numeric(1L))
 
-  mean(biases, na.rm = TRUE)
+    mean(biases, na.rm = TRUE)
 }
 
-#  Nystrm leave-anchor-out error 
+#  Nystrm leave-anchor-out error
 
 #' Leave-anchor-out Nystrm projection error
 #'
@@ -206,49 +257,68 @@ woven_effect_bias <- function(Z, outcome, treatment, labels, true_effects) {
 #' @param n_loo integer, number of anchors to hold out (default = all, slow)
 #' @param sigma_proj optional bandwidth for Nystrm kernel
 #' @return scalar >= 0, lower is better (mean Frobenius error per subject)
+#' @examples
+#' set.seed(1)
+#' n <- 20
+#' K <- 2L
+#' X1 <- matrix(rnorm(n * 5), n, 5)
+#' X2 <- matrix(rnorm(n * 4), n, 4)
+#' Y <- rep(1:2, each = n / 2)
+#' miss <- matrix(FALSE, n, 2)
+#' miss[c(15, 17, 19), 1] <- TRUE
+#' miss[c(16, 18, 20), 2] <- TRUE
+#' X1m <- X1
+#' X1m[miss[, 1], ] <- NA
+#' X2m <- X2
+#' X2m[miss[, 2], ] <- NA
+#' anchor_idx <- which(rowSums(miss) == 0)
+#' raw_fit <- woven_v2(X1m, X2m, anchor_idx = anchor_idx, Y = Y, K = K)
+#' woven_nystrom_error(raw_fit, X1m, X2m, n_loo = 3L)
 #' @export
 woven_nystrom_error <- function(fit, X1, X2, n_loo = NULL, sigma_proj = NULL) {
-  anchor_idx <- fit$anchor_idx
-  n_a        <- length(anchor_idx)
-  if (is.null(n_loo)) n_loo <- n_a
+    anchor_idx <- fit$anchor_idx
+    n_a <- length(anchor_idx)
+    if (is.null(n_loo)) n_loo <- n_a
 
-  n_loo  <- min(n_loo, n_a)
-  loo_set <- sample(seq_len(n_a), n_loo)
+    n_loo <- min(n_loo, n_a)
+    loo_set <- sample(seq_len(n_a), n_loo)
 
-  errors <- vapply(loo_set, function(j) {
-    held_out   <- anchor_idx[j]
-    remain_idx <- anchor_idx[-j]
+    errors <- vapply(loo_set, function(j) {
+        held_out <- anchor_idx[j]
+        remain_idx <- anchor_idx[-j]
 
-    # Build a mini-fit with held-out anchor removed
-    mini_fit           <- fit
-    mini_fit$anchor_idx <- remain_idx
-    if (!is.null(fit$Za1)) {
-      mini_fit$Za1 <- fit$Za1[-j, , drop = FALSE]
-      mini_fit$Za2 <- fit$Za2[-j, , drop = FALSE]
-    } else if (!is.null(fit$Za_list)) {
-      mini_fit$Za_list <- lapply(fit$Za_list, function(Z) Z[-j, , drop = FALSE])
-    }
+        # Build a mini-fit with held-out anchor removed
+        mini_fit <- fit
+        mini_fit$anchor_idx <- remain_idx
+        if (!is.null(fit$Za1)) {
+            mini_fit$Za1 <- fit$Za1[-j, , drop = FALSE]
+            mini_fit$Za2 <- fit$Za2[-j, , drop = FALSE]
+        } else if (!is.null(fit$Za_list)) {
+            mini_fit$Za_list <- lapply(fit$Za_list, function(Z) Z[-j, , drop = FALSE])
+        }
 
-    # True direct score
-    Z_true <- if (!is.null(fit$Za1)) {
-      (fit$Za1[j, , drop = FALSE] + fit$Za2[j, , drop = FALSE]) / 2
-    } else {
-      Reduce("+", lapply(fit$Za_list, function(Z) Z[j, , drop = FALSE])) / fit$V
-    }
+        # True direct score
+        Z_true <- if (!is.null(fit$Za1)) {
+            (fit$Za1[j, , drop = FALSE] + fit$Za2[j, , drop = FALSE]) / 2
+        } else {
+            Reduce("+", lapply(fit$Za_list, function(Z) Z[j, , drop = FALSE])) / fit$V
+        }
 
-    # Projected score via Nystrm
-    X1_i <- X1[held_out, , drop = FALSE]
-    X2_i <- X2[held_out, , drop = FALSE]
-    proj  <- tryCatch(
-      woven_project(mini_fit, X1_i, X2_i, sigma_proj = sigma_proj),
-      error = function(e) NULL
-    )
-    if (is.null(proj) || any(is.na(proj$Z))) return(NA_real_)
+        # Projected score via Nystrm
+        X1_i <- X1[held_out, , drop = FALSE]
+        X2_i <- X2[held_out, , drop = FALSE]
+        proj <- tryCatch(
+            woven_project(mini_fit, X1_i, X2_i, sigma_proj = sigma_proj),
+            error = function(e) NULL
+        )
+        if (is.null(proj) || any(is.na(proj$Z))) {
+            return(NA_real_)
+        }
 
-    sqrt(sum((proj$Z - Z_true)^2))
-  }, numeric(1L))
+        sqrt(sum((proj$Z - Z_true)^2))
+    }, numeric(1L))
 
-  mean(errors, na.rm = TRUE)
+    mean(errors, na.rm = TRUE)
 }
 
 #  Balanced Error Rate (BER)
@@ -270,37 +340,55 @@ woven_nystrom_error <- function(fit, X1, X2, n_loo = NULL, sigma_proj = NULL) {
 #' @param X2 optional matrix (for Nystrm LOO error)
 #' @param n_loo integer, anchors to hold out for Nystrm LOO (default 20)
 #' @return named list of metric values
+#' @examples
+#' set.seed(1)
+#' n <- 20
+#' K <- 2L
+#' X1 <- matrix(rnorm(n * 5), n, 5)
+#' X2 <- matrix(rnorm(n * 4), n, 4)
+#' Y <- rep(1:2, each = n / 2)
+#' miss <- matrix(FALSE, n, 2)
+#' miss[c(15, 17, 19), 1] <- TRUE
+#' miss[c(16, 18, 20), 2] <- TRUE
+#' X1[miss[, 1], ] <- NA
+#' X2[miss[, 2], ] <- NA
+#' anchor_idx <- which(rowSums(miss) == 0)
+#' fit <- woven(list(X1, X2), Y = Y, anchor_idx = anchor_idx, K = K)
+#' woven_all_metrics(fit$Z, Y, n_total = n)
 #' @export
 woven_all_metrics <- function(Z, labels, n_total,
-                               Z_true       = NULL,
-                               outcome      = NULL,
-                               treatment    = NULL,
-                               true_effects = NULL,
-                               fit          = NULL,
-                               X1           = NULL,
-                               X2           = NULL,
-                               n_loo        = 20L) {
-  stopifnot(nrow(Z) == length(labels))
+                              Z_true = NULL,
+                              outcome = NULL,
+                              treatment = NULL,
+                              true_effects = NULL,
+                              fit = NULL,
+                              X1 = NULL,
+                              X2 = NULL,
+                              n_loo = 20L) {
+    stopifnot(nrow(Z) == length(labels))
 
-  out <- list(
-    silhouette      = woven_silhouette(Z, labels),
-    davies_bouldin  = woven_davies_bouldin(Z, labels),
-    nmi             = woven_nmi(Z, labels),
-    ess_retention   = woven_ess_retention(nrow(Z), n_total)
-  )
-  # BER is NOT computed here. It requires per-fold DR refitting to avoid
-  # circularity: supervised methods encode labels into Z, so fixed-Z BER
-  # recovers labels by construction. BER is computed in benchmark_one_rep.R
-  # via ber_held_out_lda(): DR refit per fold, test subjects never seen during W fit.
+    out <- list(
+        silhouette      = woven_silhouette(Z, labels),
+        davies_bouldin  = woven_davies_bouldin(Z, labels),
+        nmi             = woven_nmi(Z, labels),
+        ess_retention   = woven_ess_retention(nrow(Z), n_total)
+    )
+    # BER is NOT computed here. It requires per-fold DR refitting to avoid
+    # circularity: supervised methods encode labels into Z, so fixed-Z BER
+    # recovers labels by construction. BER is computed in benchmark_one_rep.R
+    # via ber_held_out_lda(): DR refit per fold, test subjects never seen during W fit.
 
-  if (!is.null(Z_true))
-    out$rv_coefficient <- woven_rv(Z, Z_true)
+    if (!is.null(Z_true)) {
+        out$rv_coefficient <- woven_rv(Z, Z_true)
+    }
 
-  if (!is.null(outcome) && !is.null(treatment) && !is.null(true_effects))
-    out$effect_bias <- woven_effect_bias(Z, outcome, treatment, labels, true_effects)
+    if (!is.null(outcome) && !is.null(treatment) && !is.null(true_effects)) {
+        out$effect_bias <- woven_effect_bias(Z, outcome, treatment, labels, true_effects)
+    }
 
-  if (!is.null(fit) && !is.null(X1) && !is.null(X2))
-    out$nystrom_error <- woven_nystrom_error(fit, X1, X2, n_loo = n_loo)
+    if (!is.null(fit) && !is.null(X1) && !is.null(X2)) {
+        out$nystrom_error <- woven_nystrom_error(fit, X1, X2, n_loo = n_loo)
+    }
 
-  out
+    out
 }

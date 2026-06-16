@@ -55,14 +55,17 @@ construction (use when X_list has many NA rows from block-missingness)}
 }
 \value{
 object of class "woven" with:
-  $W_list        list of V projection matrices, each p_v x K
-  $Z_anchors     list of V anchor latent score matrices, each n_a x K
-  $singular_values  K values (canonical correlations, supervised)
-  $anchor_idx    anchor subject indices
-  $Y_levels      label levels (for prediction)
-  $K, $V, $n, $lambdas, $gamma_y, $alpha
-  $fit_v2        raw woven_v2 output (V=2 only)
-  $fit_als       raw woven_als output (V>=3 only)
+  \describe{
+    \item{$Z}{n x K matrix of consensus latent scores for ALL n subjects
+      (anchors and block-missing). The primary output for downstream analysis.}
+    \item{$W_list}{list of V projection matrices, each p_v x K}
+    \item{$Z_anchors}{list of V anchor latent score matrices, each n_a x K}
+    \item{$singular_values}{K supervised canonical correlations}
+    \item{$anchor_idx}{indices of anchor (fully-observed) subjects}
+    \item{$Y_levels}{class label levels used during fitting}
+    \item{$K, $V, $n}{dimensions}
+    \item{$lambdas, $gamma_y, $alpha}{hyperparameters}
+  }
 }
 \description{
 Learns a shared supervised latent space across V omics modalities, handling
@@ -74,13 +77,25 @@ For V=2, uses the closed-form supervised CCA solver (fast, exact).
 For V>=3, uses the ALS solver with label-kernel supervision.
 }
 \examples{
-\donttest{
-fit  <- woven(list(X1, X2), Y = group_labels, anchor_idx = complete_cases)
-proj <- woven_project(fit$fit_v2, X1, X2)
-pred <- woven_predict(fit, list(X1_new, X2_new))
-}
+set.seed(1)
+n <- 60
+p1 <- 20
+p2 <- 15
+K <- 2
+Y <- rep(1:2, each = n / 2)
+X1 <- matrix(rnorm(n * p1), n, p1)
+X2 <- matrix(rnorm(n * p2), n, p2)
+# 30\% block missingness; enforce >= 1 view per subject
+miss <- matrix(runif(n * 2) < 0.3, n, 2)
+all_miss <- which(rowSums(miss) == 2)
+for (i in all_miss) miss[i, sample(2, 1)] <- FALSE
+X1[miss[, 1], ] <- NA
+X2[miss[, 2], ] <- NA
+anchor_idx <- which(rowSums(miss) == 0)
+fit <- woven(list(X1, X2), Y = Y, anchor_idx = anchor_idx, K = K)
+dim(fit$Z) # 60 x 2 -- all subjects scored
 
 }
 \seealso{
-[woven_project()], [woven_predict()], [woven_all_metrics()]
+[woven_scores()], [woven_predict()], [woven_all_metrics()]
 }

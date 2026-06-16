@@ -16,44 +16,44 @@
 #' @return sparse n_full x n_full symmetric combinatorial Laplacian (dgCMatrix).
 #' @keywords internal
 build_laplacian <- function(X, k = 15L, sigma = NULL) {
-  n_full <- nrow(X)
+    n_full <- nrow(X)
 
-  # Identify block-missing rows (entire row NA) -- excluded, never imputed
-  all_na_row <- rowSums(!is.na(X)) == 0L
-  obs_idx    <- which(!all_na_row)
-  n_obs      <- length(obs_idx)
+    # Identify block-missing rows (entire row NA) -- excluded, never imputed
+    all_na_row <- rowSums(!is.na(X)) == 0L
+    obs_idx <- which(!all_na_row)
+    n_obs <- length(obs_idx)
 
-  if (n_obs == 0L) stop("No observed rows in X -- cannot build Laplacian.")
-  k <- min(k, n_obs - 1L)
+    if (n_obs == 0L) stop("No observed rows in X -- cannot build Laplacian.")
+    k <- min(k, n_obs - 1L)
 
-  # Impute only within observed rows (feature-level NAs only)
-  X_obs <- na_impute_median(X[obs_idx, , drop = FALSE])
+    # Impute only within observed rows (feature-level NAs only)
+    X_obs <- na_impute_median(X[obs_idx, , drop = FALSE])
 
-  # k-NN via kd-tree on observed subjects only
-  nn   <- RANN::nn2(X_obs, k = k + 1L)
-  idx  <- nn$nn.idx[,  -1L, drop = FALSE]   # n_obs x k
-  dsts <- nn$nn.dists[, -1L, drop = FALSE]  # n_obs x k
+    # k-NN via kd-tree on observed subjects only
+    nn <- RANN::nn2(X_obs, k = k + 1L)
+    idx <- nn$nn.idx[, -1L, drop = FALSE] # n_obs x k
+    dsts <- nn$nn.dists[, -1L, drop = FALSE] # n_obs x k
 
-  # RBF bandwidth: median heuristic over observed edges
-  if (is.null(sigma)) {
-    sigma <- median(dsts[dsts > 0])
-    if (!is.finite(sigma) || sigma == 0) sigma <- 1.0
-  }
+    # RBF bandwidth: median heuristic over observed edges
+    if (is.null(sigma)) {
+        sigma <- median(dsts[dsts > 0])
+        if (!is.finite(sigma) || sigma == 0) sigma <- 1.0
+    }
 
-  # Build affinity in obs-space, embed into full n_full x n_full
-  from_f <- obs_idx[rep(seq_len(n_obs), times = k)]
-  to_f   <- obs_idx[as.vector(idx)]
-  w      <- exp(-(as.vector(dsts)^2) / sigma^2)
+    # Build affinity in obs-space, embed into full n_full x n_full
+    from_f <- obs_idx[rep(seq_len(n_obs), times = k)]
+    to_f <- obs_idx[as.vector(idx)]
+    w <- exp(-(as.vector(dsts)^2) / sigma^2)
 
-  W <- Matrix::sparseMatrix(
-    i    = c(from_f, to_f),
-    j    = c(to_f,   from_f),
-    x    = rep(w / 2, 2),
-    dims = c(n_full, n_full),
-    repr = "C"
-  )
-  W@x <- pmin(W@x, 1.0)
+    W <- Matrix::sparseMatrix(
+        i    = c(from_f, to_f),
+        j    = c(to_f, from_f),
+        x    = rep(w / 2, 2),
+        dims = c(n_full, n_full),
+        repr = "C"
+    )
+    W@x <- pmin(W@x, 1.0)
 
-  d <- Matrix::rowSums(W)
-  Matrix::Diagonal(x = d) - W
+    d <- Matrix::rowSums(W)
+    Matrix::Diagonal(x = d) - W
 }

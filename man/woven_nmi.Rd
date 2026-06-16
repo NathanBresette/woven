@@ -24,7 +24,7 @@ k-means run 10 times to reduce initialization variance.
 }
 \examples{
 set.seed(1)
-Z <- matrix(rnorm(60 * 3), 60, 3)
-labels <- rep(1:3, each = 20)
+Z <- matrix(rnorm(40 * 2), 40, 2)
+labels <- rep(1:2, each = 20)
 woven_nmi(Z, labels)
 }
