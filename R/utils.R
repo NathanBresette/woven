@@ -155,8 +155,5 @@ check_woven_inputs <- function(X_list, anchor_idx, K) {
 
 # Suppress R CMD check notes for variables used inside closures/lapply
 utils::globalVariables(c(
-    "centroids", "Z_ref_knn", "uniform_p", # woven_predict closures
-    "W_list", "B_list", "Xa_list", "KY", "IKY", # ALS closures
-    "obj_prev", "obj_trace", # ALS iteration
-    "b_orth", "soft_thresh" # ALS local fns seen by nested closures
+    "centroids", "Z_ref_knn", "uniform_p" # woven_predict closures
 ))

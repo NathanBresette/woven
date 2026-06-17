@@ -247,75 +247,56 @@ woven_effect_bias <- function(Z, outcome, treatment, labels, true_effects) {
 
 #' Leave-anchor-out Nystrm projection error
 #'
-#' For each anchor subject, temporarily removes it from the anchor set,
-#' projects it via Nystrm using remaining anchors, and computes ||Z_proj - Z_direct||.
-#' Quantifies how well the Nystrm extension generalizes.
+#' For each held-out anchor subject, refits WOVEN without it, projects via
+#' direct W scoring, and computes ||Z_proj - Z_direct||.
+#' Quantifies how well the projection generalizes across anchor subsets.
 #'
-#' @param fit output of woven_v2() or woven_als()
-#' @param X1 n x p1 matrix for modality 1 (unmasked)
-#' @param X2 n x p2 matrix for modality 2 (unmasked)
-#' @param n_loo integer, number of anchors to hold out (default = all, slow)
-#' @param sigma_proj optional bandwidth for Nystrm kernel
-#' @return scalar >= 0, lower is better (mean Frobenius error per subject)
+#' @param fit a woven object from [woven()]
+#' @param X_list list of complete (no block-missing) modality matrices, same
+#'   structure as passed to [woven()]
+#' @param n_loo integer, number of anchors to hold out (default min(20, n_a))
+#' @param sigma_proj unused, kept for compatibility
+#' @return scalar >= 0, lower is better (mean Frobenius error per anchor)
 #' @examples
-#' set.seed(1)
-#' n <- 20
-#' K <- 2L
-#' X1 <- matrix(rnorm(n * 5), n, 5)
-#' X2 <- matrix(rnorm(n * 4), n, 4)
-#' Y <- rep(1:2, each = n / 2)
-#' miss <- matrix(FALSE, n, 2)
-#' miss[c(15, 17, 19), 1] <- TRUE
-#' miss[c(16, 18, 20), 2] <- TRUE
-#' X1m <- X1
-#' X1m[miss[, 1], ] <- NA
-#' X2m <- X2
-#' X2m[miss[, 2], ] <- NA
-#' anchor_idx <- which(rowSums(miss) == 0)
-#' raw_fit <- woven_v2(X1m, X2m, anchor_idx = anchor_idx, Y = Y, K = K)
-#' woven_nystrom_error(raw_fit, X1m, X2m, n_loo = 3L)
+#' data(woven_example)
+#' fit <- woven(woven_example$X_complete, Y = woven_example$Y, K = 3L)
+#' woven_nystrom_error(fit, woven_example$X_complete, n_loo = 5L)
 #' @export
-woven_nystrom_error <- function(fit, X1, X2, n_loo = NULL, sigma_proj = NULL) {
+woven_nystrom_error <- function(fit, X_list, n_loo = NULL, sigma_proj = NULL) {
+    if (!inherits(fit, "woven")) stop("fit must be a woven object.")
     anchor_idx <- fit$anchor_idx
     n_a <- length(anchor_idx)
-    if (is.null(n_loo)) n_loo <- n_a
-
+    if (is.null(n_loo)) n_loo <- min(20L, n_a)
     n_loo <- min(n_loo, n_a)
     loo_set <- sample(seq_len(n_a), n_loo)
+    V <- length(fit$W_list)
 
     errors <- vapply(loo_set, function(j) {
-        held_out <- anchor_idx[j]
+        held_out  <- anchor_idx[j]
         remain_idx <- anchor_idx[-j]
 
-        # Build a mini-fit with held-out anchor removed
-        mini_fit <- fit
-        mini_fit$anchor_idx <- remain_idx
-        if (!is.null(fit$Za1)) {
-            mini_fit$Za1 <- fit$Za1[-j, , drop = FALSE]
-            mini_fit$Za2 <- fit$Za2[-j, , drop = FALSE]
-        } else if (!is.null(fit$Za_list)) {
-            mini_fit$Za_list <- lapply(fit$Za_list, function(Z) Z[-j, , drop = FALSE])
-        }
+        # True score from full fit
+        Z_true <- Reduce("+", lapply(fit$Za_list, function(Z) Z[j, , drop = FALSE])) / V
 
-        # True direct score
-        Z_true <- if (!is.null(fit$Za1)) {
-            (fit$Za1[j, , drop = FALSE] + fit$Za2[j, , drop = FALSE]) / 2
-        } else {
-            Reduce("+", lapply(fit$Za_list, function(Z) Z[j, , drop = FALSE])) / fit$V
-        }
-
-        # Projected score via Nystrm
-        X1_i <- X1[held_out, , drop = FALSE]
-        X2_i <- X2[held_out, , drop = FALSE]
-        proj <- tryCatch(
-            woven_project(mini_fit, X1_i, X2_i, sigma_proj = sigma_proj),
+        # LOO fit without this anchor
+        X_loo <- lapply(X_list, function(X) {
+            Xi <- X; Xi[held_out, ] <- NA_real_; Xi
+        })
+        mini <- tryCatch(
+            woven_mcca_dual(X_loo, anchor_idx = remain_idx,
+                            Y = as.integer(as.factor(fit$Y_anchor[-j])),
+                            K = fit$K, lambdas = fit$lambdas,
+                            gamma_y = fit$gamma_y, verbose = FALSE),
             error = function(e) NULL
         )
-        if (is.null(proj) || any(is.na(proj$Z))) {
-            return(NA_real_)
-        }
+        if (is.null(mini)) return(NA_real_)
 
-        sqrt(sum((proj$Z - Z_true)^2))
+        # Direct W projection of held-out subject
+        Xh <- lapply(seq_len(V), function(v) X_list[[v]][held_out, , drop = FALSE])
+        Z_proj <- Reduce("+", lapply(seq_len(V), function(v)
+            Xh[[v]] %*% mini$W_list[[v]])) / V
+
+        sqrt(sum((Z_proj - Z_true)^2))
     }, numeric(1L))
 
     mean(errors, na.rm = TRUE)
@@ -340,22 +321,7 @@ woven_nystrom_error <- function(fit, X1, X2, n_loo = NULL, sigma_proj = NULL) {
 #' @param X2 optional matrix (for Nystrm LOO error)
 #' @param n_loo integer, anchors to hold out for Nystrm LOO (default 20)
 #' @return named list of metric values
-#' @examples
-#' set.seed(1)
-#' n <- 20
-#' K <- 2L
-#' X1 <- matrix(rnorm(n * 5), n, 5)
-#' X2 <- matrix(rnorm(n * 4), n, 4)
-#' Y <- rep(1:2, each = n / 2)
-#' miss <- matrix(FALSE, n, 2)
-#' miss[c(15, 17, 19), 1] <- TRUE
-#' miss[c(16, 18, 20), 2] <- TRUE
-#' X1[miss[, 1], ] <- NA
-#' X2[miss[, 2], ] <- NA
-#' anchor_idx <- which(rowSums(miss) == 0)
-#' fit <- woven(list(X1, X2), Y = Y, anchor_idx = anchor_idx, K = K)
-#' woven_all_metrics(fit$Z, Y, n_total = n)
-#' @export
+#' @keywords internal
 woven_all_metrics <- function(Z, labels, n_total,
                               Z_true = NULL,
                               outcome = NULL,

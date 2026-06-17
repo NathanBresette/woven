@@ -4,42 +4,28 @@
 \alias{woven_nystrom_error}
 \title{Leave-anchor-out Nystrm projection error}
 \usage{
-woven_nystrom_error(fit, X1, X2, n_loo = NULL, sigma_proj = NULL)
+woven_nystrom_error(fit, X_list, n_loo = NULL, sigma_proj = NULL)
 }
 \arguments{
-\item{fit}{output of woven_v2() or woven_als()}
+\item{fit}{a woven object from [woven()]}
 
-\item{X1}{n x p1 matrix for modality 1 (unmasked)}
+\item{X_list}{list of complete (no block-missing) modality matrices, same
+structure as passed to [woven()]}
 
-\item{X2}{n x p2 matrix for modality 2 (unmasked)}
+\item{n_loo}{integer, number of anchors to hold out (default min(20, n_a))}
 
-\item{n_loo}{integer, number of anchors to hold out (default = all, slow)}
-
-\item{sigma_proj}{optional bandwidth for Nystrm kernel}
+\item{sigma_proj}{unused, kept for compatibility}
 }
 \value{
-scalar >= 0, lower is better (mean Frobenius error per subject)
+scalar >= 0, lower is better (mean Frobenius error per anchor)
 }
 \description{
-For each anchor subject, temporarily removes it from the anchor set,
-projects it via Nystrm using remaining anchors, and computes ||Z_proj - Z_direct||.
-Quantifies how well the Nystrm extension generalizes.
+For each held-out anchor subject, refits WOVEN without it, projects via
+direct W scoring, and computes ||Z_proj - Z_direct||.
+Quantifies how well the projection generalizes across anchor subsets.
 }
 \examples{
-set.seed(1)
-n <- 20
-K <- 2L
-X1 <- matrix(rnorm(n * 5), n, 5)
-X2 <- matrix(rnorm(n * 4), n, 4)
-Y <- rep(1:2, each = n / 2)
-miss <- matrix(FALSE, n, 2)
-miss[c(15, 17, 19), 1] <- TRUE
-miss[c(16, 18, 20), 2] <- TRUE
-X1m <- X1
-X1m[miss[, 1], ] <- NA
-X2m <- X2
-X2m[miss[, 2], ] <- NA
-anchor_idx <- which(rowSums(miss) == 0)
-raw_fit <- woven_v2(X1m, X2m, anchor_idx = anchor_idx, Y = Y, K = K)
-woven_nystrom_error(raw_fit, X1m, X2m, n_loo = 3L)
+data(woven_example)
+fit <- woven(woven_example$X_complete, Y = woven_example$Y, K = 3L)
+woven_nystrom_error(fit, woven_example$X_complete, n_loo = 5L)
 }

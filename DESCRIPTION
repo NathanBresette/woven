@@ -41,8 +41,6 @@ Suggests:
     ggplot2,
     RSpectra,
     testthat (>= 3.0.0),
-    mixOmics,
-    BiocStyle,
     knitr,
     rmarkdown
 VignetteBuilder: knitr

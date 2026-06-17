@@ -330,6 +330,48 @@ print.woven <- function(x, ...) {
     invisible(x)
 }
 
+#' Summarise a WOVEN fit
+#'
+#' Prints a compact metrics table: silhouette, Davies-Bouldin, NMI, and ESS
+#' for the scored subjects.  Requires class labels.
+#'
+#' @param object a woven object from [woven()]
+#' @param labels character, factor, or integer vector of length n.
+#' @param ... unused
+#' @return Invisibly returns a named numeric vector of metrics.
+#' @export
+#' @examples
+#' data(woven_example)
+#' fit <- woven(woven_example$X_complete, Y = woven_example$Y, K = 3L)
+#' summary(fit, labels = woven_example$Y)
+summary.woven <- function(object, labels = NULL, ...) {
+    cat(sprintf("WOVEN fit  [V=%d  K=%d  n=%d]\n",
+        length(object$W_list), object$K, object$n))
+    cat(sprintf("  Modalities : %s\n",
+        paste(object$mod_names %||% seq_along(object$W_list), collapse = ", ")))
+    cat(sprintf("  Classes    : %s\n",
+        paste(object$Y_labels %||% "unknown", collapse = ", ")))
+    n_scored <- sum(!is.na(object$Z[, 1L]))
+    cat(sprintf("  Scored     : %d / %d  (ESS = %.2f)\n",
+        n_scored, object$n, n_scored / object$n))
+    cat(sprintf("  Singular values: %s\n",
+        paste(round(object$singular_values[seq_len(min(5L, object$K))], 3),
+              collapse = ", ")))
+    if (!is.null(labels)) {
+        m <- woven_metrics(object, labels)
+        cat(sprintf("\n  Silhouette : %6.3f\n", m["Silhouette"]))
+        cat(sprintf("  Davies-Bouldin : %6.3f\n", m["Davies-Bouldin"]))
+        cat(sprintf("  NMI        : %6.3f\n", m["NMI"]))
+        cat(sprintf("  ESS        : %6.3f\n", m["ESS"]))
+        invisible(m)
+    } else {
+        cat("  (Pass labels = Y to compute silhouette / NMI / ESS)\n")
+        invisible(NULL)
+    }
+}
+
+`%||%` <- function(a, b) if (!is.null(a)) a else b
+
 #' Plot the WOVEN latent space
 #'
 #' Plots the first two latent dimensions from \code{fit$Z}, colored by group

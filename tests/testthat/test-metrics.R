@@ -67,25 +67,17 @@ test_that("woven_ess_retention is n_used/n_total", {
   expect_equal(woven_ess_retention(300L, 300L), 1.0)
 })
 
-test_that("woven_all_metrics returns finite values with supervised fit", {
+test_that("woven_metrics returns named numeric vector from fit", {
   set.seed(7)
   n <- 60; K <- 3L
-  groups <- rep(1:3, 20)
-  X1 <- matrix(rnorm(n * 50), n, 50)
-  X2 <- matrix(rnorm(n * 30), n, 30)
-  miss <- 1:15; anchor_idx <- (max(miss) + 1):n
-  X1_m <- X1; X1_m[miss, ] <- NA
+  groups <- rep(c("A", "B", "C"), 20)
+  X1 <- matrix(rnorm(n * 30), n, 30)
+  X2 <- matrix(rnorm(n * 20), n, 20)
 
-  fit  <- woven_v2(X1_m, X2, anchor_idx, Y = groups, K = K,
-                   lambda1 = 0.1, lambda2 = 0.1, gamma_y = 1.0)
-  proj <- woven_project(fit, X1_m, X2)
-  Z_true <- matrix(rnorm(n * K), n, K)
+  fit <- woven(list(X1, X2), Y = groups, K = K)
+  m   <- woven_metrics(fit, groups)
 
-  m <- woven_all_metrics(proj$Z, groups, n_total = n, Z_true = Z_true)
-
-  expect_true(is.finite(m$silhouette))
-  expect_true(is.finite(m$davies_bouldin))
-  expect_true(is.finite(m$nmi))
-  expect_equal(m$ess_retention, 1.0)
-  expect_true(is.finite(m$rv_coefficient))
+  expect_named(m, c("Silhouette", "Davies-Bouldin", "NMI", "ESS"))
+  expect_true(all(is.finite(m)))
+  expect_equal(m["ESS"], c(ESS = 1.0))
 })
