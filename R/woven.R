@@ -20,7 +20,8 @@
 #' @param Y integer or factor vector of length n  -- class labels for all subjects.
 #'   Only anchor subjects' labels enter the supervised objective.
 #' @param anchor_idx integer vector  -- indices of fully-observed subjects
-#'   (observed in all V modalities). Must have length >= K.
+#'   (observed in all V modalities). Must have length >= K. If NULL (default),
+#'   anchors are detected automatically as subjects with no block-missing modalities.
 #' @param K integer  -- number of latent dimensions (default 5)
 #' @param lambdas numeric scalar or length-V vector  -- Laplacian regularization
 #'   strength per modality (default 0.1 for all)
@@ -52,26 +53,22 @@
 #'
 #' @examples
 #' set.seed(1)
-#' n <- 60
-#' p1 <- 20
-#' p2 <- 15
-#' K <- 2
+#' n <- 60; p1 <- 20; p2 <- 15; K <- 2
 #' Y <- rep(1:2, each = n / 2)
 #' X1 <- matrix(rnorm(n * p1), n, p1)
 #' X2 <- matrix(rnorm(n * p2), n, p2)
 #' # 30% block missingness; enforce >= 1 view per subject
 #' miss <- matrix(runif(n * 2) < 0.3, n, 2)
-#' all_miss <- which(rowSums(miss) == 2)
-#' for (i in all_miss) miss[i, sample(2, 1)] <- FALSE
+#' for (i in which(rowSums(miss) == 2)) miss[i, sample(2, 1)] <- FALSE
 #' X1[miss[, 1], ] <- NA
 #' X2[miss[, 2], ] <- NA
-#' anchor_idx <- which(rowSums(miss) == 0)
-#' fit <- woven(list(X1, X2), Y = Y, anchor_idx = anchor_idx, K = K)
+#' # anchor_idx auto-detected from NA pattern -- no need to specify
+#' fit <- woven(list(X1, X2), Y = Y, K = K)
 #' dim(fit$Z) # 60 x 2 -- all subjects scored
 #'
 #' @seealso [woven_scores()], [woven_predict()], [woven_all_metrics()]
 #' @export
-woven <- function(X_list, Y, anchor_idx,
+woven <- function(X_list, Y, anchor_idx = NULL,
                   K = 5L,
                   lambdas = 0.1,
                   gamma_y = 1.0,
@@ -87,6 +84,21 @@ woven <- function(X_list, Y, anchor_idx,
     if (V < 2L) stop("X_list must contain at least 2 modalities.")
     n <- nrow(X_list[[1]])
     if (length(Y) != n) stop("length(Y) must equal nrow(X_list[[1]]).")
+
+    #  Auto-detect anchors (subjects with all modalities observed)
+    if (is.null(anchor_idx)) {
+        block_missing <- vapply(X_list, function(X) {
+            apply(X, 1L, function(row) all(is.na(row)))
+        }, logical(n))
+        anchor_idx <- which(rowSums(block_missing) == 0L)
+        if (verbose) message(sprintf(
+            "Auto-detected %d anchor subjects (%.0f%% of n=%d with all modalities observed).",
+            length(anchor_idx), 100 * length(anchor_idx) / n, n
+        ))
+        if (length(anchor_idx) == 0L)
+            stop("No fully-observed subjects found. Every subject is block-missing in at least one modality.")
+    }
+
     if (length(anchor_idx) < K) {
         stop(sprintf("Need at least K=%d anchor subjects; got %d.", K, length(anchor_idx)))
     }

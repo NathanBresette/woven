@@ -119,13 +119,13 @@ names(X_miss) <- names(X_list)
 
 ```{r fit}
 fit <- woven(
-    X_list     = X_miss,
-    Y          = labels,
-    anchor_idx = anchor_idx,
-    K          = K,
-    lambdas    = 0.01, # graph Laplacian regularization
-    gamma_y    = 5.0, # label supervision strength
-    k_nn       = 10L # k-NN graph for Laplacian
+    X_list  = X_miss,
+    Y       = labels,
+    K       = K,
+    lambdas = 0.01, # graph Laplacian regularization
+    gamma_y = 5.0, # label supervision strength
+    k_nn    = 10L  # k-NN graph for Laplacian
+    # anchor_idx auto-detected from NA pattern
 )
 
 fit # print summary

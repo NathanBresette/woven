@@ -7,7 +7,7 @@
 woven(
   X_list,
   Y,
-  anchor_idx,
+  anchor_idx = NULL,
   K = 5L,
   lambdas = 0.1,
   gamma_y = 1,
@@ -27,7 +27,8 @@ Subjects missing an entire modality should have that matrix row set to NA.}
 Only anchor subjects' labels enter the supervised objective.}
 
 \item{anchor_idx}{integer vector  -- indices of fully-observed subjects
-(observed in all V modalities). Must have length >= K.}
+(observed in all V modalities). Must have length >= K. If NULL (default),
+anchors are detected automatically as subjects with no block-missing modalities.}
 
 \item{K}{integer  -- number of latent dimensions (default 5)}
 
@@ -78,21 +79,17 @@ For V>=3, uses the ALS solver with label-kernel supervision.
 }
 \examples{
 set.seed(1)
-n <- 60
-p1 <- 20
-p2 <- 15
-K <- 2
+n <- 60; p1 <- 20; p2 <- 15; K <- 2
 Y <- rep(1:2, each = n / 2)
 X1 <- matrix(rnorm(n * p1), n, p1)
 X2 <- matrix(rnorm(n * p2), n, p2)
 # 30\% block missingness; enforce >= 1 view per subject
 miss <- matrix(runif(n * 2) < 0.3, n, 2)
-all_miss <- which(rowSums(miss) == 2)
-for (i in all_miss) miss[i, sample(2, 1)] <- FALSE
+for (i in which(rowSums(miss) == 2)) miss[i, sample(2, 1)] <- FALSE
 X1[miss[, 1], ] <- NA
 X2[miss[, 2], ] <- NA
-anchor_idx <- which(rowSums(miss) == 0)
-fit <- woven(list(X1, X2), Y = Y, anchor_idx = anchor_idx, K = K)
+# anchor_idx auto-detected from NA pattern -- no need to specify
+fit <- woven(list(X1, X2), Y = Y, K = K)
 dim(fit$Z) # 60 x 2 -- all subjects scored
 
 }

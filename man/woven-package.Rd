@@ -16,12 +16,17 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Nathan Bresette \email{nathanbresette04@gmail.com}
+\strong{Maintainer}: Nathan Bresette \email{nathanbresette04@gmail.com} (\href{https://orcid.org/0009-0003-1554-6006}{ORCID})
 
 Authors:
 \itemize{
   \item Ai-Ling Lin
   \item Jianlin Cheng
+}
+
+Other contributors:
+\itemize{
+  \item National Institutes of Health / National Institute on Aging (R56AG079586) [funder]
 }
 
 }
