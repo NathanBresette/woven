@@ -11,11 +11,11 @@
 #' n_full x n_full; rows/cols for block-missing subjects are structural zeros.
 #'
 #' @param X numeric matrix, n x p.
-#' @param k integer, number of nearest neighbors (default 15)
+#' @param k integer, number of nearest neighbors (default 10)
 #' @param sigma numeric, RBF bandwidth. NULL = median heuristic over observed edges.
 #' @return sparse n_full x n_full symmetric combinatorial Laplacian (dgCMatrix).
 #' @keywords internal
-build_laplacian <- function(X, k = 15L, sigma = NULL) {
+build_laplacian <- function(X, k = 10L, sigma = NULL) {
     n_full <- nrow(X)
 
     # Identify block-missing rows (entire row NA) -- excluded, never imputed
@@ -30,20 +30,20 @@ build_laplacian <- function(X, k = 15L, sigma = NULL) {
     X_obs <- na_impute_median(X[obs_idx, , drop = FALSE])
 
     # k-NN via kd-tree on observed subjects only
-    nn <- RANN::nn2(X_obs, k = k + 1L)
-    idx <- nn$nn.idx[, -1L, drop = FALSE] # n_obs x k
-    dsts <- nn$nn.dists[, -1L, drop = FALSE] # n_obs x k
+    nn   <- RANN::nn2(X_obs, k = k + 1L)
+    idx  <- nn$nn.idx[,  -1L, drop = FALSE]   # n_obs x k
+    dsts <- nn$nn.dists[, -1L, drop = FALSE]  # n_obs x k
 
     # RBF bandwidth: median heuristic over observed edges
     if (is.null(sigma)) {
-        sigma <- median(dsts[dsts > 0])
+        sigma <- stats::median(dsts[dsts > 0])
         if (!is.finite(sigma) || sigma == 0) sigma <- 1.0
     }
 
     # Build affinity in obs-space, embed into full n_full x n_full
     from_f <- obs_idx[rep(seq_len(n_obs), times = k)]
-    to_f <- obs_idx[as.vector(idx)]
-    w <- exp(-(as.vector(dsts)^2) / sigma^2)
+    to_f   <- obs_idx[as.vector(idx)]
+    w      <- exp(-(as.vector(dsts)^2) / sigma^2)
 
     W <- Matrix::sparseMatrix(
         i    = c(from_f, to_f),

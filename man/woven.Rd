@@ -11,11 +11,8 @@ woven(
   K = 5L,
   lambdas = 0.1,
   gamma_y = 1,
-  alpha = 0,
-  k_nn = 15L,
-  X_list_full = NULL,
-  n_restarts = 5L,
-  max_iter = 200L,
+  k_nn = 10L,
+  precomp = NULL,
   verbose = TRUE
 )
 }
@@ -39,18 +36,12 @@ strength per modality (default 0.1 for all)}
 Default 1.0 (equal weight to cross-modal alignment and label alignment).
 Tune via cross-validation on anchor set if labels are noisy.}
 
-\item{alpha}{numeric >= 0 or length-2 vector [alpha1, alpha2]  -- L1 sparsity
-on projection matrices W (default 0 = dense). Analogous to DIABLO's keepX.
-Set to ~0.01-0.1 for interpretable sparse feature loadings.}
+\item{k_nn}{integer  -- k-nearest-neighbors for Laplacian graph (default 10).
+Ignored when \code{precomp} is supplied.}
 
-\item{k_nn}{integer  -- k-nearest-neighbors for Laplacian graph (default 15)}
-
-\item{X_list_full}{optional list of complete unmasked matrices for Laplacian
-construction (use when X_list has many NA rows from block-missingness)}
-
-\item{n_restarts}{integer  -- ALS random restarts, V>=3 only (default 5)}
-
-\item{max_iter}{integer  -- ALS max iterations, V>=3 only (default 200)}
+\item{precomp}{optional output of [woven_precompute()] -- pre-built Laplacians.
+Pass this when calling \code{woven()} multiple times on the same data (e.g.
+hyperparameter search, cross-validation) to avoid rebuilding the graph each time.}
 
 \item{verbose}{logical  -- print progress (default TRUE)}
 }
@@ -65,7 +56,7 @@ object of class "woven" with:
     \item{$anchor_idx}{indices of anchor (fully-observed) subjects}
     \item{$Y_levels}{class label levels used during fitting}
     \item{$K, $V, $n}{dimensions}
-    \item{$lambdas, $gamma_y, $alpha}{hyperparameters}
+    \item{$lambdas, $gamma_y}{hyperparameters}
   }
 }
 \description{

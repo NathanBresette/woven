@@ -44,6 +44,13 @@ cat(sprintf("[task %d] ARM %s rep %s\n", task_id, arm_ltr, rep_str))
 
 `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0 && !is.na(a[1])) a else b
 
+# Vectorised column medians with finite fallback (avoids per-column apply loop)
+colMedians_safe <- function(X) {
+  m <- apply(X, 2L, median, na.rm = TRUE)
+  m[!is.finite(m)] <- 0
+  m
+}
+
 # ── Source WOVEN ──────────────────────────────────────────────────────────────
 for (f in c("utils.R", "laplacian.R", "solver_mcca_dual.R",
             "project.R", "metrics.R")) {
@@ -189,22 +196,25 @@ ber_held_out_lda <- function(anchor_idx, labels, cv_folds, z_fold_fn) {
 run_woven <- function(X_list_miss, anchor_idx, labels, K, cv_folds, precomp = NULL) {
   t0 <- proc.time()
 
-  # Helper: project non-anchor subjects using W (direct for available views, no imputation)
+  # Vectorised projection: V BLAS matrix multiplies instead of n×V R loop
   project_all <- function(fit_W, Za_mean) {
-    Z_full <- matrix(NA_real_, nrow = n, ncol = K)
-    Z_full[anchor_idx, ] <- Za_mean
-    non_anc <- setdiff(seq_len(n), anchor_idx)
-    if (length(non_anc) == 0L) return(Z_full)
-    for (i in non_anc) {
-      scores <- lapply(seq_len(V), function(v) {
-        xi <- X_list_miss[[v]][i, , drop = FALSE]
-        if (all(is.na(xi))) return(NULL)
-        if (any(is.na(xi))) xi <- na_impute_median(xi)
-        xi %*% fit_W[[v]]
-      })
-      valid <- Filter(Negate(is.null), scores)
-      if (length(valid) > 0L) Z_full[i, ] <- colMeans(do.call(rbind, valid))
+    Z_acc   <- matrix(0,       n, K)
+    obs_cnt <- integer(n)
+    for (v in seq_len(V)) {
+      Xv  <- X_list_miss[[v]]
+      obs <- which(!apply(Xv, 1L, function(r) all(is.na(r))))
+      if (length(obs) == 0L) next
+      Xv_obs <- Xv[obs, , drop = FALSE]
+      Xv_obs[is.na(Xv_obs)] <- 0          # zero-fill feature-level NAs
+      Z_acc[obs, ] <- Z_acc[obs, ] + Xv_obs %*% fit_W[[v]]
+      obs_cnt[obs] <- obs_cnt[obs] + 1L
     }
+    none <- obs_cnt == 0L
+    obs_cnt[none] <- 1L
+    Z_full <- Z_acc / obs_cnt
+    Z_full[none, ] <- NA_real_
+    # Overwrite anchors with their exact Za scores (no averaging artefact)
+    Z_full[anchor_idx, ] <- Za_mean
     Z_full
   }
 
@@ -216,49 +226,56 @@ run_woven <- function(X_list_miss, anchor_idx, labels, K, cv_folds, precomp = NU
     gamma_grid  <- c(0.5, 1.0, 5.0, 10.0)
     best_lambda <- 0.01; best_gamma <- 1.0; best_sil <- -Inf
 
+    # Pre-compute fold Laplacian submatrices once — reused across all grid values
+    # Avoids 27 redundant sparse submatrix operations (5 lambda + 4 gamma) × 3 folds
+    n_folds   <- length(cv_folds)
+    mc_cores  <- min(n_folds, parallel::detectCores())
+    fold_La <- if (!is.null(precomp)) {
+      lapply(seq_len(n_folds), function(f) {
+        trn_a <- anchor_idx[-cv_folds[[f]]]
+        lapply(precomp, function(p) as.matrix(p$L[trn_a, trn_a, drop = FALSE]))
+      })
+    } else {
+      vector("list", n_folds)
+    }
+
     # Stage 1: best lambda (gamma_y = 1.0)
     for (lam in lambda_grid) {
       sils <- unlist(parallel::mclapply(seq_along(cv_folds), function(f) {
         trn_a <- anchor_idx[-cv_folds[[f]]]
         val_a <- anchor_idx[cv_folds[[f]]]
         tryCatch({
-          La_trn <- if (!is.null(precomp))
-            lapply(precomp, function(p) as.matrix(p$L[trn_a, trn_a, drop=FALSE]))
-          else NULL
           cv_fit <- woven_mcca_dual(
             X_list = X_list_miss, anchor_idx = trn_a, Y = labels, K = K,
             lambdas = lam, gamma_y = 1.0,
-            La_list_precomp = La_trn, verbose = FALSE
+            La_list_precomp = fold_La[[f]], verbose = FALSE
           )
           Za_val <- Reduce("+", lapply(seq_len(V), function(v)
             X_list_miss[[v]][val_a, , drop=FALSE] %*% cv_fit$W_list[[v]])) / V
           anchor_sil(Za_val, labels[val_a])
         }, error = function(e) NA_real_)
-      }, mc.cores = min(2L, parallel::detectCores())))
+      }, mc.cores = mc_cores))
       ms <- mean(sils, na.rm = TRUE)
       if (is.finite(ms) && ms > best_sil) { best_sil <- ms; best_lambda <- lam }
     }
 
-    # Stage 2: best gamma_y (best_lambda fixed) — mcca_dual is fast enough
+    # Stage 2: best gamma_y (best_lambda fixed)
     best_sil <- -Inf
     for (gam in gamma_grid) {
       sils <- unlist(parallel::mclapply(seq_along(cv_folds), function(f) {
         trn_a <- anchor_idx[-cv_folds[[f]]]
         val_a <- anchor_idx[cv_folds[[f]]]
         tryCatch({
-          La_trn <- if (!is.null(precomp))
-            lapply(precomp, function(p) as.matrix(p$L[trn_a, trn_a, drop=FALSE]))
-          else NULL
           cv_fit <- woven_mcca_dual(
             X_list = X_list_miss, anchor_idx = trn_a, Y = labels, K = K,
             lambdas = best_lambda, gamma_y = gam,
-            La_list_precomp = La_trn, verbose = FALSE
+            La_list_precomp = fold_La[[f]], verbose = FALSE
           )
           Za_val <- Reduce("+", lapply(seq_len(V), function(v)
             X_list_miss[[v]][val_a, , drop=FALSE] %*% cv_fit$W_list[[v]])) / V
           anchor_sil(Za_val, labels[val_a])
         }, error = function(e) NA_real_)
-      }, mc.cores = min(2L, parallel::detectCores())))
+      }, mc.cores = mc_cores))
       ms <- mean(sils, na.rm = TRUE)
       if (is.finite(ms) && ms > best_sil) { best_sil <- ms; best_gamma <- gam }
     }
@@ -279,25 +296,22 @@ run_woven <- function(X_list_miss, anchor_idx, labels, K, cv_folds, precomp = NU
     # Use Xa_list (already column-filtered/imputed) for Z_trn to match W dims.
     # Use col_ok_list to select the same feature subset for Z_val.
     ber <- ber_held_out_lda(anchor_idx, labels, cv_folds, function(trn_a, val_a) {
+      f_idx <- which(vapply(cv_folds, function(fi)
+        identical(anchor_idx[fi], val_a), logical(1L)))
+      La_trn <- if (length(f_idx) == 1L) fold_La[[f_idx]] else NULL
       tryCatch({
-        La_trn <- if (!is.null(precomp))
-          lapply(precomp, function(p) as.matrix(p$L[trn_a, trn_a, drop=FALSE]))
-        else NULL
         f_trn <- woven_mcca_dual(X_list_miss, trn_a, labels, K=K,
           lambdas=best_lambda, gamma_y=best_gamma,
           La_list_precomp=La_trn, verbose=FALSE)
-        # Z_trn: use Xa_list (same cols as W — avoids dimension mismatch)
         Z_trn <- Reduce("+", lapply(seq_len(V), function(v)
           f_trn$Xa_list[[v]] %*% f_trn$W_list[[v]])) / V
-        # Z_val: select same feature columns as training, impute NAs with trn median
+        # Vectorised NA fill: replace column NAs with training median in one pass
         Z_val <- Reduce("+", lapply(seq_len(V), function(v) {
           cols <- f_trn$col_ok_list[[v]]
           xv   <- X_list_miss[[v]][val_a, cols, drop=FALSE]
-          med  <- apply(f_trn$Xa_list[[v]], 2, median, na.rm=TRUE)
-          med[!is.finite(med)] <- 0
-          for (j in seq_len(ncol(xv))) {
-            nas <- is.na(xv[, j]); if (any(nas)) xv[nas, j] <- med[j]
-          }
+          med  <- colMedians_safe(f_trn$Xa_list[[v]])
+          na_mask <- is.na(xv)
+          xv[na_mask] <- med[col(xv)[na_mask]]
           xv %*% f_trn$W_list[[v]]
         })) / V
         list(Z_trn = Z_trn, Z_val = Z_val)

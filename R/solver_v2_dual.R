@@ -134,7 +134,7 @@ woven_v2_dual <- function(X1, X2, anchor_idx, Y,
     }
 
     sv <- if (K_use < min(nrow(P_dual), ncol(P_dual)) - 1L && K_use >= 1L) {
-        tryCatch(RSpectra::svds(P_dual, k = K_use),
+        tryCatch(.svds_safe(P_dual, k = K_use),
             error = function(e) svd(P_dual, nu = K_use, nv = K_use)
         )
     } else {

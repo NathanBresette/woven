@@ -1,21 +1,23 @@
 #!/bin/bash
-#SBATCH --job-name=grama_bench_v3
+#SBATCH --job-name=woven_bench_v4
 #SBATCH --array=1-400
 #SBATCH --partition=general
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=3
 #SBATCH --mem=32G
 #SBATCH --time=01:30:00
-#SBATCH --output=/home/nbhtd/grama/logs/bench_v3_%A_%a.out
-#SBATCH --error=/home/nbhtd/grama/logs/bench_v3_%A_%a.err
+#SBATCH --output=/home/nbhtd/grama/logs/bench_v4_%A_%a.out
+#SBATCH --error=/home/nbhtd/grama/logs/bench_v4_%A_%a.err
 
-# WOVEN Benchmarking v3 — mcca_dual unified solver (no iterations, global optimum)
-# Each task: one rep × all conditions (complete, mcar30, mcar50, mar) × 4 methods
-# Wall time reduced from 4h to 1.5h: mcca_dual is ~50x faster than primal
+# WOVEN Benchmarking v4 — speed improvements over v3:
+#   - Vectorised project_all (BLAS matmul, not per-subject R loop)
+#   - Fold Laplacians precomputed once before CV grid (27->3 extractions)
+#   - mc.cores=3 (one per CV fold, matches cpus-per-task=3)
+#   - Vectorised BER Z_val NA fill
 
 set -euo pipefail
 
 DATA_DIR=/home/nbhtd/grama/data
-OUT_DIR=/home/nbhtd/grama/results/benchmark_v3
+OUT_DIR=/home/nbhtd/grama/results/benchmark_v4
 WOVEN_SRC=/home/nbhtd/grama/R
 LOG_DIR=/home/nbhtd/grama/logs
 
@@ -26,8 +28,8 @@ export PATH=/home/nbhtd/miniconda3/bin:$PATH
 R_EXEC=/home/nbhtd/miniconda3/bin/Rscript
 
 # Limit OpenBLAS threads to avoid oversubscription on shared nodes
-export OMP_NUM_THREADS=2
-export OPENBLAS_NUM_THREADS=2
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
 
 # Python for MOFA2 via reticulate (mofapy2 installed in conda env)
 export RETICULATE_PYTHON=/home/nbhtd/miniconda3/bin/python

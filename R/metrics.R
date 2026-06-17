@@ -392,3 +392,45 @@ woven_all_metrics <- function(Z, labels, n_total,
 
     out
 }
+
+#' Convenience wrapper: compute core metrics directly from a woven fit
+#'
+#' Calls [woven_all_metrics()] using \code{fit$Z} and \code{fit$n} so you
+#' do not need to extract them manually. Returns silhouette, Davies-Bouldin,
+#' NMI, and ESS retention as a named numeric vector.
+#'
+#' @param fit woven object from [woven()]
+#' @param labels integer, factor, or character vector of length n with subgroup
+#'   labels for all subjects (same Y passed to [woven()])
+#' @param ... additional arguments forwarded to [woven_all_metrics()]
+#' @return named numeric vector of metric values, printed as a tidy table
+#' @examples
+#' set.seed(1)
+#' n <- 40; K <- 2L
+#' X1 <- matrix(rnorm(n * 8), n, 8)
+#' X2 <- matrix(rnorm(n * 6), n, 6)
+#' Y <- rep(1:2, each = n / 2)
+#' miss <- matrix(runif(n * 2) < 0.3, n, 2)
+#' for (i in which(rowSums(miss) == 2)) miss[i, sample(2, 1)] <- FALSE
+#' X1[miss[, 1], ] <- NA
+#' X2[miss[, 2], ] <- NA
+#' fit <- woven(list(X1, X2), Y = Y, K = K)
+#' woven_metrics(fit, Y)
+#' @seealso [woven_all_metrics()], [woven_silhouette()], [woven_nmi()]
+#' @export
+woven_metrics <- function(fit, labels, ...) {
+    stopifnot(inherits(fit, "woven"))
+    stopifnot(length(labels) == fit$n)
+
+    scored <- !is.na(fit$Z[, 1L])
+    res <- woven_all_metrics(
+        Z       = fit$Z[scored, , drop = FALSE],
+        labels  = labels[scored],
+        n_total = fit$n,
+        ...
+    )
+
+    out <- unlist(res[c("silhouette", "davies_bouldin", "nmi", "ess_retention")])
+    names(out) <- c("Silhouette", "Davies-Bouldin", "NMI", "ESS")
+    out
+}

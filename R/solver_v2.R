@@ -58,7 +58,7 @@
     for (k in seq_len(K)) {
         # Warm start from leading singular vector
         sv0 <- if (min(nrow(C_r), ncol(C_r)) >= 2L) {
-            tryCatch(RSpectra::svds(C_r, k = 1L),
+            tryCatch(.svds_safe(C_r, k = 1L),
                 error = function(e) svd(C_r, nu = 1L, nv = 1L)
             )
         } else {
@@ -261,7 +261,7 @@ woven_v2 <- function(X1, X2, anchor_idx, Y,
         W1 <- sq1$inv_sqrt %*% U
         W2 <- sq2$inv_sqrt %*% V
     } else {
-        sv <- RSpectra::svds(P, k = K)
+        sv <- .svds_safe(P, k = K)
         U <- sv$u
         V <- sv$v
         svals <- sv$d

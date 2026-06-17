@@ -28,11 +28,12 @@ test_that("woven() print method runs without error", {
   expect_output(print(fit), "WOVEN fit")
 })
 
-test_that("woven() V=2 dispatches to woven_v2", {
+test_that("woven() uses mcca_dual for all V", {
   d <- make_fixture()
   fit <- woven(list(d$X1, d$X2), Y = d$groups, anchor_idx = d$anchor_idx,
                K = d$K, verbose = FALSE)
-  expect_false(is.null(fit$fit_v2))
+  expect_false(is.null(fit$fit_mcca))
+  expect_null(fit$fit_v2)
   expect_null(fit$fit_als)
   expect_length(fit$W_list, 2L)
   expect_equal(nrow(fit$W_list[[1]]), ncol(d$X1))

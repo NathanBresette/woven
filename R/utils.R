@@ -1,5 +1,27 @@
 # utils.R  -- Internal matrix utilities for WOVEN
 
+# RSpectra is Suggests: use it when available, fall back to base R silently.
+# Both helpers return the same structure as the RSpectra originals.
+.svds_safe <- function(X, k) {
+    if (requireNamespace("RSpectra", quietly = TRUE)) {
+        return(RSpectra::svds(X, k = k))
+    }
+    k <- min(k, nrow(X), ncol(X))
+    sv <- svd(X, nu = k, nv = k)
+    list(u = sv$u[, seq_len(k), drop = FALSE],
+         d = sv$d[seq_len(k)],
+         v = sv$v[, seq_len(k), drop = FALSE])
+}
+
+.eigs_sym_safe <- function(B, k) {
+    if (requireNamespace("RSpectra", quietly = TRUE)) {
+        return(RSpectra::eigs_sym(B, k = k, which = "LM"))
+    }
+    eig <- eigen(B, symmetric = TRUE)
+    list(values  = eig$values[seq_len(k)],
+         vectors = eig$vectors[, seq_len(k), drop = FALSE])
+}
+
 #' Compute regularized B matrix: B_v = X^T X + lambda * Omega
 #'
 #' @param X numeric matrix, n x p (all samples, full modality)
@@ -59,7 +81,7 @@ mat_sqrt <- function(B, tol = 1e-10, n_rank = NULL) {
     use_trunc <- !is.null(n_rank) && p > 500L && n_rank < p
     if (use_trunc) {
         k <- min(n_rank, p - 1L)
-        eig <- RSpectra::eigs_sym(B, k = k, which = "LM")
+        eig <- .eigs_sym_safe(B, k = k)
         vals <- eig$values
         vecs <- eig$vectors
     } else {

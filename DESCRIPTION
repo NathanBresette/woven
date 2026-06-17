@@ -32,12 +32,14 @@ biocViews: Software, StatisticalMethod, MultipleComparison, GeneExpression,
 Depends:
     R (>= 4.5.0)
 Imports:
-    graphics,
     Matrix,
     RANN,
-    RSpectra,
-    cluster
+    cluster,
+    parallel,
+    stats
 Suggests:
+    ggplot2,
+    RSpectra,
     testthat (>= 3.0.0),
     mixOmics,
     BiocStyle,
@@ -45,3 +47,7 @@ Suggests:
     rmarkdown
 VignetteBuilder: knitr
 Config/testthat/edition: 3
+Author: Nathan Bresette [aut, cre] (<https://orcid.org/0009-0003-1554-6006>),
+    Ai-Ling Lin [aut],
+    Jianlin Cheng [aut]
+Maintainer: Nathan Bresette <nathanbresette04@gmail.com>

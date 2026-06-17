@@ -135,7 +135,7 @@ woven_als_dual <- function(X_list, anchor_idx, Y,
 
     # ── Precompute top-K left singular vectors of each Xa (for PCA warm start) ─
     Xa_svd_U <- lapply(Xa_list, function(Xa) {
-        tryCatch(RSpectra::svds(Xa, k = K)$u,
+        tryCatch(.svds_safe(Xa, k = K)$u,
             error = function(e) matrix(rnorm(n_a * K), n_a, K)
         )
     })
@@ -234,7 +234,7 @@ woven_als_dual <- function(X_list, anchor_idx, Y,
     svals <- if (V == 2L) {
         svd(crossprod(Za_list[[1]], Za_list[[2]]))$d[seq_len(K)]
     } else {
-        tryCatch(RSpectra::svds(do.call(cbind, Za_list), k = K)$d,
+        tryCatch(.svds_safe(do.call(cbind, Za_list), k = K)$d,
             error = function(e) rep(NA_real_, K)
         )
     }

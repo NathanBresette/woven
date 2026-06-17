@@ -5,7 +5,7 @@ date: "`r Sys.Date()`"
 output:
   BiocStyle::html_document:
     toc: true
-    toc_depth: 2
+    toc_depth: 3
 vignette: >
   %\VignetteIndexEntry{Introduction to WOVEN}
   %\VignetteEngine{knitr::rmarkdown}
@@ -15,9 +15,11 @@ vignette: >
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
     collapse = TRUE,
-    comment = "#>",
-    fig.width = 7,
-    fig.height = 5
+    comment  = "#>",
+    fig.width  = 8,
+    fig.height = 5,
+    warning  = FALSE,
+    message  = FALSE
 )
 ```
 
@@ -29,173 +31,251 @@ are missing entire assay blocks. Standard methods such as `mixOmics::DIABLO`
 enforce a strict intersection constraint: every patient must have every
 modality, so patients missing even one block are discarded. In a typical
 three-platform study this can eliminate 50--80% of enrolled subjects,
-systematically excluding the sickest patients who are most likely to be
-missing a blood draw or imaging scan.
+systematically excluding the sickest patients.
 
-WOVEN solves this by:
-
-1. Learning shared projection matrices $W_v$ using only **anchor subjects**
-   (fully-observed complete cases), solving a supervised SUMCOR MCCA in dual
-   space via a single closed-form eigendecomposition.
-2. Projecting **block-missing subjects** into the shared latent space using
-   their available modalities directly ($z_i = x_i W_v$), or via Nyström
-   extension when an entire modality block is absent.
-
-No feature-level imputation is performed at any stage.
+WOVEN solves this by learning projection matrices W from **anchor subjects**
+(fully-observed complete cases), then projecting block-missing subjects using
+their available views. No feature-level imputation is performed.
 
 # Installation
 
 ```{r install, eval=FALSE}
-if (!requireNamespace("BiocManager", quietly = TRUE)) {
+if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
-}
 BiocManager::install("woven")
+```
+
+# Preparing Your Data
+
+## Input format
+
+`woven()` takes a named list of matrices --- one per omics platform --- where:
+
+- Rows are **subjects** (same order across all matrices)
+- Columns are **features** (genes, CpGs, proteins, metabolites, etc.)
+- Subjects missing an **entire modality block** have that row set to `NA`
+
+```{r data-format, eval=FALSE}
+# Correct format: row = subject, col = feature
+# Subjects missing a platform have that entire row set to NA
+X_list <- list(
+    RNA   = rna_matrix,    # n x p_rna,  missing rows = all NA
+    Methyl = methyl_matrix, # n x p_meth, missing rows = all NA
+    Prot  = prot_matrix    # n x p_prot, missing rows = all NA
+)
+```
+
+## Pre-processing recommendations
+
+**WOVEN expects pre-processed, approximately continuous data.** Apply standard
+platform-specific normalization before passing data to `woven()`:
+
+| Platform | Recommended pre-processing |
+|---|---|
+| RNA-seq (bulk) | `log1p(CPM)` then `scale()` per gene |
+| DNA methylation | M-values (`log2(beta/(1-beta))`), then `scale()` |
+| Proteomics (LC-MS) | `log2(intensity)`, median-center per sample |
+| Metabolomics | `log2` transform, then `scale()` |
+| Microbiome (16S) | CLR transform (e.g. `compositions::clr()`) |
+
+Raw counts, raw beta values, or raw intensities will produce poorly scaled
+projection matrices. When in doubt, `scale()` each modality matrix so all
+features have mean 0 and SD 1.
+
+```{r preprocess, eval=FALSE}
+# Example: log1p + scale for RNA-seq
+X_rna_scaled <- scale(log1p(raw_counts))
+
+# Then set block-missing rows to NA (do NOT impute)
+X_rna_scaled[subjects_missing_rna, ] <- NA
 ```
 
 # Quick Start
 
-## Simulate a small three-modality dataset
+## Simulate a three-modality dataset
 
 ```{r simulate}
 library(woven)
 set.seed(42)
 
-n <- 120 # total subjects
-p1 <- 200 # modality 1 features (e.g. RNA-seq)
-p2 <- 80 # modality 2 features (e.g. methylation)
-p3 <- 30 # modality 3 features (e.g. proteomics)
-K <- 3 # latent dimensions
+n       <- 150   # total subjects
+K       <- 3     # latent dimensions to learn
 n_groups <- 3
 
-# True group labels
-labels <- rep(1:n_groups, each = n / n_groups)
+# True group labels (e.g. CN, MCI, Dementia)
+Y <- factor(rep(c("CN", "MCI", "Dementia"), each = n / n_groups),
+            levels = c("CN", "MCI", "Dementia"))
 
-# Simulate group-discriminative signal in each modality
-make_view <- function(p, labels, signal = 2) {
-    n <- length(labels)
-    X <- matrix(rnorm(n * p), n, p)
-    for (g in unique(labels)) {
-        X[labels == g, 1:5] <- X[labels == g, 1:5] + signal
-    }
+# Simulate three pre-processed modality matrices with group signal
+make_modality <- function(p, Y, signal = 3) {
+    X <- matrix(rnorm(length(Y) * p), length(Y), p)
+    for (g in levels(Y))
+        X[Y == g, seq_len(8)] <- X[Y == g, seq_len(8)] + signal
+    colnames(X) <- paste0("Feature_", seq_len(p))
     X
 }
 
-X1 <- make_view(p1, labels)
-X2 <- make_view(p2, labels, signal = 3)
-X3 <- make_view(p3, labels, signal = 4)
-
-X_list <- list(rna = X1, methyl = X2, protein = X3)
+X_rna   <- make_modality(300, Y, signal = 3)
+X_meth  <- make_modality(120, Y, signal = 4)
+X_prot  <- make_modality(40,  Y, signal = 5)
 ```
 
 ## Induce block-level missingness
 
 ```{r missingness}
-# 40% MCAR block missingness -- every patient retains >= 1 modality
 set.seed(7)
-V <- length(X_list)
-miss_mask <- matrix(runif(n * V) < 0.4, n, V)
+V        <- 3
+miss_mask <- matrix(runif(n * V) < 0.35, n, V)
 
-# Enforce >= 1 view per patient
-all_miss <- which(rowSums(miss_mask) == V)
-for (i in all_miss) miss_mask[i, sample(V, 1)] <- FALSE
+# Every subject must retain at least one modality
+for (i in which(rowSums(miss_mask) == V))
+    miss_mask[i, sample(V, 1)] <- FALSE
 
-# Anchor subjects: fully observed
-anchor_idx <- which(rowSums(miss_mask) == 0L)
+# Apply missingness: entire row -> NA for missing modalities
+X_rna[ miss_mask[, 1], ] <- NA
+X_meth[miss_mask[, 2], ] <- NA
+X_prot[miss_mask[, 3], ] <- NA
+
+n_anchors <- sum(rowSums(miss_mask) == 0)
 cat(sprintf(
-    "Anchors: %d / %d (%.0f%%)\n",
-    length(anchor_idx), n, 100 * length(anchor_idx) / n
+    "Anchors (all 3 views): %d / %d (%.0f%%)\n",
+    n_anchors, n, 100 * n_anchors / n
 ))
-
-# Apply missingness
-X_miss <- lapply(seq_len(V), function(v) {
-    Xv <- X_list[[v]]
-    Xv[miss_mask[, v], ] <- NA_real_
-    Xv
-})
-names(X_miss) <- names(X_list)
 ```
 
 ## Fit WOVEN
 
+Pass a **named** list so modality labels appear in all plots automatically.
+`anchor_idx` is optional -- WOVEN detects anchors from the NA pattern.
+
 ```{r fit}
 fit <- woven(
-    X_list  = X_miss,
-    Y       = labels,
+    X_list  = list(RNA = X_rna, Methylation = X_meth, Proteomics = X_prot),
+    Y       = Y,
     K       = K,
-    lambdas = 0.01, # graph Laplacian regularization
-    gamma_y = 5.0, # label supervision strength
-    k_nn    = 10L  # k-NN graph for Laplacian
-    # anchor_idx auto-detected from NA pattern
+    lambdas = 0.01,   # graph Laplacian regularization (robust to this)
+    gamma_y = 5.0,    # label supervision strength (any value > 0 works)
+    k_nn    = 10L     # k-NN graph for Laplacian
 )
 
-fit # print summary
+fit   # prints summary + guided next steps
 ```
 
-## Inspect the latent space
+# Exploring Results
 
-`fit$Z` is an n x K matrix of consensus latent scores for **all** subjects,
-including the block-missing ones. No subject is dropped.
+## Latent space scatter
 
-```{r plot, fig.cap="WOVEN latent space. Filled points are anchor subjects (complete cases); open circles are block-missing subjects projected from their available views. Colors indicate true group membership."}
-plot(fit,
-    labels = labels,
-    main = sprintf("WOVEN latent space — %d/%d subjects scored", n, n)
-)
+`plot()` shows all scored subjects colored by group. Solid points are anchors;
+faded points are block-missing subjects projected from their available views.
+Ellipses show the 68% confidence region per group (anchors only).
+
+```{r plot-scatter, fig.cap="WOVEN latent space. All subjects are scored regardless of missingness."}
+plot(fit, labels = Y)
 ```
 
-## Score new subjects
+## VIP scores: which features matter most?
 
-`woven_scores()` projects a new cohort into the same latent space and
-returns an n_new x K matrix directly.
+Variable Importance in Projection (VIP) scores rank features by their
+contribution to the shared latent space across all K dimensions. VIP > 1
+indicates above-average importance.
 
-```{r scores_new}
-# Simulate 20 new subjects with random block missingness
-set.seed(99)
-X_new <- lapply(X_list, function(Xv) Xv[1:20, ])
-miss_new <- matrix(runif(20 * V) < 0.4, 20, V)
-for (i in 1:20) if (all(miss_new[i, ])) miss_new[i, sample(V, 1)] <- FALSE
-for (v in seq_len(V)) X_new[[v]][miss_new[, v], ] <- NA_real_
-
-Z_new <- woven_scores(fit, X_new)
-dim(Z_new) # 20 x K
+```{r plot-vip, fig.cap="Top RNA features by VIP score."}
+woven_plot_vip(fit, modality = "RNA", n_top = 15)
 ```
 
-## Predict classes for new subjects
+Plot VIP for a different modality:
 
-`woven_predict()` returns class probabilities alongside latent scores.
+```{r plot-vip2, fig.cap="Top methylation features by VIP score."}
+woven_plot_vip(fit, modality = "Methylation", n_top = 15)
+```
+
+## Feature loadings: direction of effect
+
+Loadings show which features push subjects in the positive vs. negative
+direction along a given latent dimension. Equivalent to `plotLoadings()` in
+DIABLO.
+
+```{r plot-loadings, fig.width=10, fig.cap="Top feature loadings for latent dimension 1 across all three modalities."}
+woven_plot_loadings(fit, dim = 1L, n_top = 10)
+```
+
+## Variance explained: choosing K
+
+Use this to verify that your chosen K captures most of the shared signal.
+If the last dimension still explains substantial variance, increase K.
+
+```{r plot-variance, fig.cap="Proportion of shared variance explained per latent dimension."}
+woven_plot_variance(fit)
+```
+
+## Quantitative metrics
+
+`woven_metrics()` computes silhouette score, Davies-Bouldin index, NMI, and
+effective sample size (ESS) retention directly from the fit object.
+
+```{r metrics}
+woven_metrics(fit, Y)
+```
+
+ESS = 1.00 means every subject with at least one observed modality was scored.
+Compare this to DIABLO, which can only score subjects present in all modalities.
+
+# Predicting New Subjects
 
 ```{r predict}
+# Simulate 20 new subjects with partial missingness
+set.seed(99)
+X_new <- list(
+    RNA         = make_modality(300, Y[1:20], signal = 3),
+    Methylation = make_modality(120, Y[1:20], signal = 4),
+    Proteomics  = make_modality(40,  Y[1:20], signal = 5)
+)
+# Some new subjects are missing a modality
+X_new$RNA[1:5, ]        <- NA
+X_new$Proteomics[6:10, ] <- NA
+
 pred <- woven_predict(fit, X_new)
 head(pred[, 1:3])
 ```
 
-# Choosing Hyperparameters
+`predicted_class` returns original label names ("CN", "MCI", "Dementia"),
+not integer codes.
 
-WOVEN has three hyperparameters. Defaults work well in practice (confirmed
-by sensitivity analysis across four orders of magnitude in the paper):
+# Comparing WOVEN and DIABLO: Effective Sample Size
 
-| Parameter | Default | Role |
-|-----------|---------|------|
-| `lambdas` | 0.1     | Graph Laplacian regularization strength |
-| `gamma_y` | 1.0     | Label supervision strength (0 = unsupervised CCA) |
-| `k_nn`    | 15      | k-NN graph connectivity for Laplacian |
+The key advantage of WOVEN over `mixOmics::DIABLO` is **effective sample size
+(ESS)**. DIABLO requires every subject to have every modality; WOVEN scores
+all subjects with at least one observed view.
 
-Setting `gamma_y = 0` reduces WOVEN to unsupervised dual CCA -- the
-supervision term is essential for discriminative performance.
+```{r ess-comparison}
+n_anchors <- length(fit$anchor_idx)    # what DIABLO would use
+n_woven   <- sum(!is.na(fit$Z[, 1]))  # what WOVEN scores
 
-# Comparison with DIABLO
-
-The key advantage of WOVEN over `mixOmics::DIABLO` is effective sample
-size (ESS): DIABLO discards every subject missing any modality, while WOVEN
-retains all subjects with at least one observed view.
-
-```{r ess}
-n_diablo <- length(anchor_idx) # DIABLO can only score complete cases
-n_woven <- sum(!is.na(fit$Z[, 1])) # WOVEN scores all subjects with >= 1 view
-
-cat(sprintf("DIABLO ESS: %d / %d (%.0f%%)\n", n_diablo, n, 100 * n_diablo / n))
-cat(sprintf("WOVEN  ESS: %d / %d (%.0f%%)\n", n_woven, n, 100 * n_woven / n))
+cat(sprintf("DIABLO ESS: %d / %d (%.0f%%)\n",
+            n_anchors, n, round(100 * n_anchors / n)))
+cat(sprintf("WOVEN  ESS: %d / %d (%.0f%%)\n",
+            n_woven,   n, round(100 * n_woven   / n)))
 ```
+
+In real cohorts, the subjects DIABLO discards are often the sickest patients
+(those who miss a blood draw or imaging scan due to disease severity),
+introducing systematic bias in comparative effectiveness estimates.
+
+# Accessing Raw Results
+
+The fit object exposes all internal quantities for custom downstream analyses:
+
+```{r access}
+dim(fit$Z)          # n x K consensus latent scores for ALL subjects
+names(fit$W_list)   # one projection matrix per modality
+dim(fit$W_list$RNA) # p_rna x K
+
+# Row names on Z come from row names of your input matrices
+# (set rownames on X_list matrices to get named rows in fit$Z)
+```
+
+`fit$Z` can be passed directly to survival analysis, clustering, or any
+downstream model as a low-dimensional representation of the full cohort.
 
 # Session Info
 

@@ -4,12 +4,12 @@
 \alias{build_laplacian}
 \title{Build sparse k-NN graph Laplacian}
 \usage{
-build_laplacian(X, k = 15L, sigma = NULL)
+build_laplacian(X, k = 10L, sigma = NULL)
 }
 \arguments{
 \item{X}{numeric matrix, n x p.}
 
-\item{k}{integer, number of nearest neighbors (default 15)}
+\item{k}{integer, number of nearest neighbors (default 10)}
 
 \item{sigma}{numeric, RBF bandwidth. NULL = median heuristic over observed edges.}
 }

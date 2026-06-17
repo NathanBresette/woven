@@ -255,7 +255,7 @@ woven_als <- function(X_list, anchor_idx, Y,
     svals <- if (V == 2L) {
         svd(crossprod(Z_list[[1]], Z_list[[2]]))$d[seq_len(K)]
     } else {
-        RSpectra::svds(do.call(cbind, Z_list), k = K)$d
+        .svds_safe(do.call(cbind, Z_list), k = K)$d
     }
 
     if (verbose) {
