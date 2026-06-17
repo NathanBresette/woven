@@ -9,7 +9,10 @@ Authors@R: c(
     person("Ai-Ling", "Lin",
            role = "aut"),
     person("Jianlin", "Cheng",
-           role = "aut")
+           role = "aut"),
+    person("National Institutes of Health / National Institute on Aging",
+           role = "fnd",
+           comment = "R56AG079586")
   )
 Description: Supervised multi-omics integration for block-missing ("ragged") data.
     WOVEN learns a shared latent space across V omics modalities using only
