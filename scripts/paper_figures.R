@@ -66,7 +66,7 @@ theme_woven <- function() {
 }
 
 # ── Load primary benchmark data ───────────────────────────────────────────────
-d <- read.csv(file.path(root,"results","summary_v3_400.csv"), stringsAsFactors=FALSE)
+d <- read.csv(file.path(root,"results","summary_v5_400.csv"), stringsAsFactors=FALSE)
 d <- d[d$error_msg=="" | is.na(d$error_msg), ]
 d$method[d$method == "GRAMA"] <- "WOVEN"
 

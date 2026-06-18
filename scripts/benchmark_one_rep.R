@@ -52,8 +52,7 @@ colMedians_safe <- function(X) {
 }
 
 # ── Source WOVEN ──────────────────────────────────────────────────────────────
-for (f in c("utils.R", "laplacian.R", "solver_mcca_dual.R",
-            "project.R", "metrics.R")) {
+for (f in c("utils.R", "laplacian.R", "solver_mcca_dual.R", "metrics.R")) {
   source(file.path(woven_src, f))
 }
 
@@ -574,8 +573,37 @@ run_impute_diablo <- function(X_list_miss, anchor_idx, labels, K, cv_folds,
 
     Z_full <- Reduce("+", lapply(mod_names, function(m) fit_d$variates[[m]])) / V
 
+    # BER: per-fold refitting with LDA on imputed data (same protocol as DIABLO)
+    des <- matrix(0.1, V, V, dimnames=list(mod_names, mod_names)); diag(des) <- 0
+    ber <- ber_held_out_lda(anchor_idx, labels, cv_folds, function(trn_a, val_a) {
+      tryCatch({
+        Xtrn <- lapply(X_filt, function(X) {
+          out <- X[trn_a, , drop=FALSE]
+          rownames(out) <- paste0("S", seq_along(trn_a))
+          out
+        })
+        names(Xtrn) <- mod_names
+        kx <- lapply(Xtrn, function(X) rep(min(best_keepX, ncol(X)), K))
+        names(kx) <- mod_names
+        f_trn <- mixOmics::block.splsda(X=Xtrn, Y=factor(labels[trn_a]),
+          ncomp=K, design=des, near.zero.var=TRUE, keepX=kx)
+        Z_trn <- Reduce("+", lapply(mod_names, function(m) f_trn$variates[[m]]))/V
+        rownames(Z_trn) <- NULL
+        X_val <- lapply(X_filt, function(X) X[val_a, , drop=FALSE])
+        names(X_val) <- mod_names
+        Z_val <- Reduce("+", lapply(mod_names, function(m) {
+          feat   <- rownames(f_trn$loadings[[m]])
+          common <- intersect(colnames(X_val[[m]]), feat)
+          if (length(common) < 2L) return(matrix(0, nrow(X_val[[m]]), K))
+          X_val[[m]][, common, drop=FALSE] %*%
+            f_trn$loadings[[m]][common, seq_len(K), drop=FALSE]
+        }))/V
+        list(Z_trn = Z_trn, Z_val = matrix(Z_val, nrow=length(val_a)))
+      }, error = function(e) NULL)
+    })
+
     elapsed <- (proc.time() - t0)[["elapsed"]]
-    list(Z=Z_full, n_used=n, elapsed=elapsed, method="ImputeDIABLO", error=NULL)
+    list(Z=Z_full, n_used=n, elapsed=elapsed, ber=ber, method="ImputeDIABLO", error=NULL)
   }, error=function(e) {
     list(Z=NULL, n_used=0L, elapsed=NA_real_,
          method="ImputeDIABLO", error=conditionMessage(e))

@@ -12,7 +12,7 @@ WOVEN learns a shared latent space using only the fully-observed **anchor** subj
 
 - Supervised: label-augmented cross-covariance pulls dimensions toward class-discriminative structure
 - Closed-form: single eigendecomposition of an (V×n_a) × (V×n_a) matrix — globally optimal, no iterations
-- Interpretable: sparse linear projection matrices W per modality
+- Interpretable: dense linear projection matrices W per modality
 
 ## Installation
 
@@ -48,16 +48,16 @@ woven_metrics(fit, woven_example$Y)
 
 | Condition | Method | Silhouette | NMI | ESS | BER |
 |---|---|---|---|---|---|
-| Complete | WOVEN | **0.828** | **1.000** | 1.00 | **0.371** |
+| Complete | WOVEN | **0.828** | **1.000** | 1.00 | **0.375** |
 | Complete | DIABLO | 0.271 | 0.539 | 1.00 | 0.528 |
-| MCAR 50% | WOVEN | 0.232 (anchor: **0.714**) | **0.482** | **1.00** | **0.397** |
-| MCAR 50% | DIABLO | 0.351 | 0.735 | 0.19 | 0.573 |
+| MCAR 50% | WOVEN | 0.218 (anchor: **0.710**) | **0.476** | **1.00** | **0.398** |
+| MCAR 50% | DIABLO | 0.350 | 0.739 | 0.19 | 0.571 |
 
 ADNI validation (MRI + Lipidomics + NMR metabolomics, 2422 subjects): WOVEN scores **70%** of patients vs DIABLO's **31%**. The 944 subjects DIABLO discards have 2× the Dementia rate.
 
 ## Citation
 
-Bresette N, Lin A-L, Cheng J. WOVEN: Weighted Omics View Embedding via Nystrom for incomplete multi-omics integration. *In preparation*, 2026.
+Bresette N, Lin A-L, Cheng J. Weighted Omics View Embedding via Nystrom (WOVEN): supervised multi-omics integration for block-missing clinical cohort data. *In preparation*, 2026.
 
 ## License
 

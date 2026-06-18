@@ -1,23 +1,20 @@
 #!/bin/bash
-#SBATCH --job-name=woven_bench_v4
+#SBATCH --job-name=woven_bench_v5
 #SBATCH --array=1-400
 #SBATCH --partition=general
 #SBATCH --cpus-per-task=3
 #SBATCH --mem=32G
 #SBATCH --time=01:30:00
-#SBATCH --output=/home/nbhtd/grama/logs/bench_v4_%A_%a.out
-#SBATCH --error=/home/nbhtd/grama/logs/bench_v4_%A_%a.err
+#SBATCH --output=/home/nbhtd/grama/logs/bench_v5_%A_%a.out
+#SBATCH --error=/home/nbhtd/grama/logs/bench_v5_%A_%a.err
 
-# WOVEN Benchmarking v4 — speed improvements over v3:
-#   - Vectorised project_all (BLAS matmul, not per-subject R loop)
-#   - Fold Laplacians precomputed once before CV grid (27->3 extractions)
-#   - mc.cores=3 (one per CV fold, matches cpus-per-task=3)
-#   - Vectorised BER Z_val NA fill
+# WOVEN Benchmarking v5 — adds BER for ImputeDIABLO (per-fold refitting,
+#   same LDA protocol as WOVEN and DIABLO).
 
 set -euo pipefail
 
 DATA_DIR=/home/nbhtd/grama/data
-OUT_DIR=/home/nbhtd/grama/results/benchmark_v4
+OUT_DIR=/home/nbhtd/grama/results/benchmark_v5
 WOVEN_SRC=/home/nbhtd/grama/R
 LOG_DIR=/home/nbhtd/grama/logs
 
