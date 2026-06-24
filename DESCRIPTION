@@ -33,6 +33,7 @@ Depends:
     R (>= 4.5.0)
 Imports:
     Matrix,
+    MatrixGenerics,
     RANN,
     cluster,
     parallel,

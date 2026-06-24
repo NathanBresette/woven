@@ -52,7 +52,7 @@ na_impute_median <- function(X) {
     all_na_col <- apply(Xc, 2, function(v) all(is.na(v)))
     Xc <- Xc[, !all_na_col, drop = FALSE]
     # Impute remaining feature-level NAs with column median
-    col_med <- apply(Xc, 2, function(v) median(v, na.rm = TRUE))
+    col_med <- MatrixGenerics::colMedians(Xc, na.rm = TRUE)
     for (j in seq_len(ncol(Xc))) {
         na_j <- is.na(Xc[, j])
         if (any(na_j)) Xc[na_j, j] <- col_med[j]
