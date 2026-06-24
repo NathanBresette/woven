@@ -103,69 +103,62 @@ We applied WOVEN to 2,422 baseline subjects from the Alzheimer's Disease Neuroim
 
 ## 3. Results
 
-WOVEN's defining property is that it scores every enrolled subject. Effective sample size stays at 1.00 under all missingness levels, while the standard supervised method DIABLO retains only 19% of subjects at 50% missingness (Section 3.3). This retention does not cost accuracy. WOVEN's balanced error rate matches or beats DIABLO in every condition and is far lower on compositional microbiome-metabolomics data (Sections 3.1, 3.3), feature-level imputation does not close that gap (Section 3.4), and as modalities go missing WOVEN degrades more gracefully than IntegrAO, the closest block-missing competitor (Section 3.2). On complete data it also roughly triples DIABLO's latent-space quality (silhouette 0.83 versus 0.27; Section 3.1). In our benchmarks, then, the complete-case constraint cost subjects, disproportionately the most affected ones (Section 3.5), and bought no accuracy in return. Tables 1 to 3 and Figures 1 to 3 summarize these results.
+WOVEN's defining property is that it scores every enrolled subject: effective sample size stays at 1.00 under all missingness levels, while the standard supervised method DIABLO retains only 19% of subjects at 50% missingness (Section 3.1). On complete data WOVEN also recovers a markedly cleaner latent space, roughly tripling DIABLO's silhouette (Section 3.2). This retention and geometry cost nothing in discriminative accuracy: WOVEN's balanced error rate matches or beats DIABLO in every condition and is far lower on compositional microbiome-metabolomics data (Section 3.3), and neither feature-level imputation nor unsupervised graph diffusion closes the gap under missingness (Section 3.4). The same pattern holds on a real cohort, where the patients DIABLO discards are disproportionately the most affected (Section 3.5). Tables 1 to 3 and Figures 1 to 3 summarize these results.
 
-### 3.1 WOVEN Recovers Latent Structure More Precisely on Complete Data
+### 3.1 WOVEN Scores Every Subject Under Block-Missingness
 
-On complete data, WOVEN recovers the cleanest latent geometry of any method tested (Table 1, Figure 2A), roughly tripling DIABLO's silhouette (0.828 vs 0.271) and reaching perfect cluster recovery (NMI = 1.00 in every replicate of every arm). This follows directly from the label-augmented objective, which aligns the canonical directions with class structure. One caveat governs how to read these two metrics: both are computed on the embedding each method was fit on, so they measure how cleanly the latent space encodes the labels, not how well it generalizes; generalization is the job of the held-out BER. The two can part ways. On the diffuse-signal arms A and B the groups are present (NMI = 1.00) but too weakly separated for held-out classification (BER near chance), and no method recovers signal there.
+The defining consequence of WOVEN's design is subject retention. At a 50% MCAR block-missing rate, DIABLO retains only 19% of subjects by enforcing its intersection constraint, whereas WOVEN scores 100% of subjects in every arm and condition (Table 1). MOFA+ also reaches an effective sample size of 1.00, through variational Bayes inference that skips missing entries; what distinguishes WOVEN is that it retains the full cohort within a supervised objective, which produces the class-structured latent space and usable classification described next. Retention is the prerequisite; the following sections establish that it comes at no cost to the quality of the embedding or to classification accuracy.
 
-Classification error tells a sharper, arm-specific story (Table 2). The overall complete-data gap (BER 0.375 for WOVEN, 0.528 for DIABLO) is carried almost entirely by ARM D, the compositional microbiome-metabolomics arm, where WOVEN's 0.145 sits far below DIABLO's 0.763. Removing DIABLO's sparsity constraint barely moves it (0.762 over 100 replicates), so this is an algorithmic gap, not a sparsity artifact. On the concentrated-signal ARM C both methods are perfect.
+### 3.2 WOVEN Recovers a Cleaner, Class-Structured Latent Space
 
-WOVEN runs in 3.2 to 12.6 seconds per replicate under complete-data conditions (ARM D fastest, ARM B slowest), compared to 4.3 to 72.8 seconds for DIABLO and 10.2 to 16.8 seconds for MOFA+. WOVEN is 5.8 to 6.8-fold faster than DIABLO on the high-dimensional ARM A and B arms (ARM B: 12.6 vs 72.8 s; ARM A: 10.6 vs 72.3 s).
+On complete data, WOVEN recovers the cleanest latent geometry of any method tested (Table 1, Figure 2A), roughly tripling DIABLO's silhouette (0.828 vs 0.271) and reaching perfect cluster recovery (NMI = 1.00 in every replicate of every arm). This follows from the label-augmented objective, which aligns the canonical directions with class structure. Both metrics are computed on the embedding each method was fit on, so they measure how cleanly the latent space encodes the labels, not how well it generalizes; generalization is the job of the held-out BER (Section 3.3).
 
+Under missingness the comparison must control for which subjects each method scores. DIABLO's apparent full-cohort silhouette advantage at 50% MCAR (0.350 vs WOVEN's 0.218) is a selection artifact: DIABLO scores only the 19% of subjects with complete data, who cluster cleanly by construction. Evaluated on the same anchor subjects the comparison reverses decisively (WOVEN 0.710 vs DIABLO 0.350; Figure 2A), and the same mechanism explains DIABLO's higher full-cohort NMI under missingness (Table 1): its geometry reflects only retained complete cases, whereas WOVEN's full-cohort values also include projected single-modality subjects with noisier estimates.
 
-**Table 1.** Subject retention and latent-space geometry across 400 replicates (4 arms × 100 reps per condition). Sil: silhouette over all scored subjects; Sil (anchor): silhouette over anchor subjects only. ESS: fraction of enrolled subjects scored. ImputeDIABLO applies only under missingness. Bold marks the best value per metric per condition on a matched population; full-cohort NMI under missingness is left unbolded (Section 3.3). Balanced error rate is reported by arm in Table 2.
+**Table 1.** Subject retention and latent-space geometry across 400 replicates (4 arms × 100 reps per condition). Sil: silhouette over all scored subjects; Sil (anchor): silhouette over anchor subjects only. ESS: fraction of enrolled subjects scored. ImputeDIABLO applies only under missingness. Under missingness, full-cohort silhouette and NMI are not comparable across methods because DIABLO scores only complete cases; the Sil (anchor) column gives the matched comparison (Section 3.2). Balanced error rate is reported by arm in Table 2.
 
 | Condition | Method | Silhouette | Sil (anchor) | NMI | ESS |
 |---|---|---|---|---|---|
-| Complete | WOVEN | **0.828** | 0.828 | **1.000** | 1.00 |
+| Complete | WOVEN | 0.828 | 0.828 | 1.000 | 1.00 |
 | Complete | DIABLO | 0.271 | 0.271 | 0.539 | 1.00 |
 | Complete | MOFA+ | 0.204 | 0.204 | 0.500 | 1.00 |
-| MCAR 30% | WOVEN | 0.293 | **0.776** | 0.535 | **1.00** |
+| MCAR 30% | WOVEN | 0.293 | 0.776 | 0.535 | 1.00 |
 | MCAR 30% | DIABLO | 0.298 | 0.298 | 0.592 | 0.42 |
 | MCAR 30% | MOFA+ | 0.189 | 0.197 | 0.475 | 1.00 |
 | MCAR 30% | ImputeDIABLO | 0.209 | 0.271 | 0.499 | 1.00 |
-| MCAR 50% | WOVEN | 0.218 | **0.710** | 0.476 | **1.00** |
+| MCAR 50% | WOVEN | 0.218 | 0.710 | 0.476 | 1.00 |
 | MCAR 50% | DIABLO | 0.350 | 0.350 | 0.739 | 0.19 |
 | MCAR 50% | MOFA+ | 0.179 | 0.192 | 0.462 | 1.00 |
 | MCAR 50% | ImputeDIABLO | 0.195 | 0.267 | 0.498 | 1.00 |
-| MAR | WOVEN | 0.297 | **0.757** | 0.546 | **1.00** |
+| MAR | WOVEN | 0.297 | 0.757 | 0.546 | 1.00 |
 | MAR | DIABLO | 0.313 | 0.313 | 0.597 | 0.41 |
 | MAR | MOFA+ | 0.186 | 0.208 | 0.473 | 1.00 |
 | MAR | ImputeDIABLO | 0.201 | 0.280 | 0.495 | 1.00 |
 
-**Table 2.** Balanced error rate by simulation arm, on complete data and at 50% MCAR (per-fold DR refitting with LDA; four-class chance = 0.75). ImputeDIABLO applies only under missingness; IntegrAO is compared in Section 3.2. Bold marks WOVEN values that improve on DIABLO.
+### 3.3 Retention and Geometry Translate to Classification
+
+Does the cleaner, fuller latent space classify better? On complete data WOVEN's overall BER is 0.375 versus DIABLO's 0.528 (Table 2). The gap is carried almost entirely by ARM D, the compositional microbiome-metabolomics arm, where WOVEN reaches 0.145 against DIABLO's 0.763; removing DIABLO's sparsity constraint barely moves it (0.762 over 100 replicates), so the gap is algorithmic, not a sparsity artifact. On the concentrated-signal ARM C both methods are perfect, while on the diffuse arms A and B both sit near chance: the groups exist in the latent space (NMI = 1.00) but the within-group signal is too weak for reliable classification, and no method recovers it.
+
+Under block-missingness this advantage persists. BER at 50% MCAR is 0.398 for WOVEN versus 0.571 for DIABLO, again driven by ARM D (0.113 vs 0.777; Table 2), and structured MAR gives comparable results (0.389 vs 0.572), so the advantage is not specific to the missingness mechanism.
+
+WOVEN is also fast. On complete data it runs in 3.2 to 12.6 seconds per replicate against 4.3 to 72.8 for DIABLO and 10.2 to 16.8 for MOFA+, a 5.8 to 6.8-fold speedup over DIABLO on the high-dimensional arms. It is faster still under missingness (down to 1.6 seconds per replicate), because the eigendecomposition scales as $O((V n_a)^3)$ in the anchor count and the anchor set shrinks; it remains 5 to 7-fold faster than DIABLO at 50% MCAR while scoring the full cohort rather than the complete-case subset.
+
+**Table 2.** Balanced error rate by simulation arm, on complete data and at 50% MCAR (per-fold DR refitting with LDA; four-class chance = 0.75). ImputeDIABLO applies only under missingness; IntegrAO is compared in Section 3.4.
 
 | Arm | Complete WOVEN | Complete DIABLO | MCAR 50% WOVEN | MCAR 50% DIABLO | MCAR 50% ImputeDIABLO |
 |---|---|---|---|---|---|
 | A (RNA+meth) | 0.673 | 0.674 | 0.713 | 0.715 | 0.739 |
 | B (RNA+meth+prot) | 0.682 | 0.675 | 0.758 | 0.754 | 0.762 |
-| C (InterSIM) | 0.000 | 0.000 | **0.007** | 0.040 | 0.040 |
-| D (micro+metab) | **0.145** | 0.763 | **0.113** | 0.777 | 0.777 |
-| All arms (mean) | **0.375** | 0.528 | **0.398** | 0.571 | 0.579 |
+| C (InterSIM) | 0.000 | 0.000 | 0.007 | 0.040 | 0.040 |
+| D (micro+metab) | 0.145 | 0.763 | 0.113 | 0.777 | 0.777 |
+| All arms (mean) | 0.375 | 0.528 | 0.398 | 0.571 | 0.579 |
 
 
-### 3.2 ARM D Reversal: Nystrom Projection Is More Robust to Block-Missingness Than Graph Diffusion
+### 3.4 Imputation and Unsupervised Graph Diffusion Do Not Close the Gap
 
-Comparing WOVEN with IntegrAO shows where its block-missing advantage actually comes from. IntegrAO was evaluated in a dedicated 100-replicate benchmark on the same simulation arms; all WOVEN numbers in this subsection are taken from that same benchmark run for a direct comparison. WOVEN's ARM D BER therefore differs slightly here (0.131 complete, 0.107 at 50% MCAR) from the main-benchmark values reported elsewhere (0.145 and 0.113; Sections 3.1, 3.3), reflecting independent cross-validation fold seeds; the difference is within replicate-level variation. On ARM D complete data, IntegrAO achieves BER = 0.086 versus WOVEN 0.131, confirming that unsupervised graph diffusion better captures NorTA microbiome-metabolomics structure when all data are available. Under 50% MCAR, this reverses: WOVEN BER is 0.107 versus IntegrAO 0.130. IntegrAO's graph diffusion constructs a subject-by-subject affinity matrix; when 50% of subjects are missing a modality, the affinity matrix is partially unobserved and must be estimated, introducing noise that degrades embedding quality. WOVEN's Nystrom projection operates on the anchor-estimated eigenvector structure, requiring only available-modality features per new subject, with no dependence on the full affinity matrix. The ARM D reversal demonstrates WOVEN's mechanism directly: anchor-restricted estimation followed by closed-form projection degrades more gracefully than graph-based methods when modality availability is heterogeneous.
+Two natural alternatives to WOVEN's projection fail to match it under missingness. The first, imputing the missing blocks before integration, does not help: ImputeDIABLO (missForest imputation followed by DIABLO) tracks DIABLO almost exactly and stays well behind WOVEN in every condition (Tables 1, 2), with overall BER 0.579 at 50% MCAR and ARM D BER identical to DIABLO's (0.777, far above WOVEN's 0.113). The reason is structural: missForest predicts individual feature values from within-modality correlations, which cannot reconstruct the cross-modal alignment that block-missingness disrupts, whereas WOVEN projects incomplete subjects through the estimated cross-modal projection matrices $W^{(v)}$.
 
-IntegrAO and WOVEN achieve equivalent performance on ARM C (BER = 0.000 for both) and WOVEN outperforms IntegrAO on diffuse arms (WOVEN 0.673/0.680 vs IntegrAO 0.747/0.763 complete), where label supervision provides a consistent advantage. IntegrAO also achieves ESS retention of 1.00 in all conditions, matching WOVEN on subject retention. The ESS advantage in this benchmark is WOVEN and IntegrAO together versus DIABLO.
-
-### 3.3 WOVEN Retains All Subjects Under Block-Missingness
-
-At 50% MCAR block-missing rates, DIABLO retains 19% of subjects by enforcing the intersection constraint. WOVEN retains 100% of subjects in every arm and condition. MOFA+ also achieves ESS = 1.00 via variational Bayes (VB) inference that skips missing entries. The distinction between WOVEN and MOFA+ under missingness lies in supervised geometry: WOVEN maintains anchor-only silhouette 0.710 at 50% MCAR versus MOFA+ 0.192, and provides BER estimates via per-fold DR refitting with labeled data, whereas MOFA+'s unsupervised objective does not.
-
-DIABLO's apparent full-cohort silhouette advantage under missingness (0.350 vs WOVEN 0.218) is an artifact of selection: DIABLO only scores the 19% of subjects with complete data, who cluster more cleanly by construction. The anchor-only comparison, evaluating both methods on the same population, reverses this decisively (WOVEN 0.710 vs DIABLO 0.350; Figure 2A). The same selection mechanism explains DIABLO's higher full-cohort NMI under missingness (Table 1): DIABLO's geometry metrics reflect only its retained complete-case subjects, whereas WOVEN's full-cohort values additionally include projected subjects, many with a single observed modality and correspondingly noisier latent estimates.
-
-BER at 50% MCAR is 0.398 for WOVEN and 0.571 for DIABLO overall, driven by ARM D (0.113 vs 0.777; Table 2). MAR block-missingness produces comparable results (WOVEN BER 0.389 vs DIABLO 0.572), so the advantage holds under both missingness mechanisms.
-
-Notably, WOVEN runs faster under block-missingness than on complete data: 1.6 to 6.2 seconds per replicate at 50% MCAR, versus 3.2 to 12.6 seconds on complete data. This speedup arises because the anchor set is smaller under missingness, reducing the eigendecomposition from $O((V n)^3)$ on complete data to $O((V n_a)^3)$ where $n_a \approx 0.25n$ for $V = 2$ and $n_a \approx 0.13n$ for $V = 3$ at 50% MCAR. DIABLO also speeds up under missingness (31.8 to 38.1 seconds for ARM A/B at mcar50 vs 72 seconds complete), for the same reason: it fits only on anchor subjects. WOVEN remains 5 to 7-fold faster than DIABLO at 50% MCAR on the high-dimensional arms, while scoring the full cohort rather than the complete-case subset.
-
-### 3.4 Imputation Does Not Recover Discriminative Signal
-
-Imputing the missing blocks before integration does not help. ImputeDIABLO (missForest imputation followed by DIABLO) tracks DIABLO almost exactly and stays well behind WOVEN in every condition (Tables 1, 2): at 50% MCAR its overall BER (0.579) matches DIABLO's (0.571), and on ARM D the two are identical (0.777), far above WOVEN's 0.113. Its anchor silhouette never reaches even DIABLO's complete-case value.
-
-Imputation and latent-space projection differ in a way that matters here. missForest predicts individual molecular feature values from within-modality cross-feature correlations, then passes the imputed matrix to DIABLO. Imputation does not reconstruct the cross-modal alignment structure that block-missingness disrupts; it replaces missing entries with within-modality predictions that carry no information about how that modality relates to others. WOVEN projects incomplete subjects through the estimated cross-modal projection matrices $W^{(v)}$, preserving the geometric relationships learned from anchor subjects.
+The second alternative, the unsupervised graph method IntegrAO, is more competitive, and the comparison pinpoints where WOVEN's advantage comes from. (IntegrAO was run as a dedicated 100-replicate benchmark; the WOVEN values quoted here come from that run, ARM D BER 0.131 complete and 0.107 at 50% MCAR, versus 0.145 and 0.113 in the main benchmark of Section 3.3, a difference within replicate-level variation from independent fold seeds.) On complete ARM D, IntegrAO reaches 0.086 versus WOVEN's 0.131: unsupervised graph diffusion captures the compositional structure better when all data are present. Under 50% MCAR this reverses, WOVEN 0.107 versus IntegrAO 0.130. IntegrAO builds a subject-by-subject affinity matrix that is partially unobserved when subjects miss a modality and must be estimated, adding noise; WOVEN's projection needs only the available-modality features of each new subject together with the anchor-estimated eigenvectors, with no dependence on the full affinity matrix. The reversal exposes the mechanism directly: anchor-restricted estimation followed by closed-form projection degrades more gracefully than graph diffusion when modality availability is heterogeneous. IntegrAO matches WOVEN on ARM C and on subject retention (ESS = 1.00), and WOVEN leads on the diffuse arms (0.673/0.680 vs 0.747/0.763 complete), so the effective sample size advantage over DIABLO is shared by WOVEN and IntegrAO, while the graceful-degradation advantage is WOVEN's alone.
 
 ### 3.5 ADNI: WOVEN Recovers Clinically Relevant Subjects That DIABLO Discards
 
@@ -176,13 +169,13 @@ Applied to 2,422 ADNI subjects, WOVEN scores 1,687 (70%) to DIABLO's 743 (31%), 
 The recovered subjects differ systematically from those retained (Table 3, Figure 3A): dementia prevalence among them is 25%, twice the 12% among DIABLO-retained subjects, and the largest recoverable group (660 subjects with lipidomics and NMR but no MRI) is missing only the imaging modality. A comparative effectiveness research (CER) analysis built on a DIABLO-derived latent space would therefore underrepresent the most severely affected patients, biasing downstream subgroup estimates.
 
 
-**Table 3.** ADNI subject retention and baseline diagnosis distribution by group. The 735 subjects with no observed modality cannot be scored by any method.
+**Table 3.** ADNI subject retention and baseline diagnosis by group. DIABLO retained: complete in all three modalities; WOVEN-recovered: missing at least one modality but scored by WOVEN; Unscored: no observed modality (scored by neither method).
 
 | Group | N | CN | MCI | Dementia |
 |---|---|---|---|---|
-| DIABLO retained (complete across all 3 modalities) | 743 | 34% | 54% | 12% |
-| WOVEN-only (missing at least 1 modality) | 944 | 28% | 47% | **25%** |
-| Unscored (no data in any modality) | 735 | 53% | 36% | 11% |
+| DIABLO retained | 743 | 34% | 54% | 12% |
+| WOVEN-recovered | 944 | 28% | 47% | 25% |
+| Unscored | 735 | 53% | 36% | 11% |
 | All enrolled | 2,422 | 38% | 47% | 15% |
 
 ### 3.6 Robustness to Anchor Fraction and Anchor Selection
