@@ -103,11 +103,11 @@ We applied WOVEN to 2,422 baseline subjects from the Alzheimer's Disease Neuroim
 
 ## 3. Results
 
-WOVEN's defining property is that it scores every enrolled subject: effective sample size stays at 1.00 under all missingness levels, while the standard supervised method DIABLO retains only 19% of subjects at 50% missingness (Section 3.1). On complete data WOVEN also recovers a markedly cleaner latent space, roughly tripling DIABLO's silhouette (Section 3.2). This retention and geometry cost nothing in discriminative accuracy: WOVEN's balanced error rate matches or beats DIABLO in every condition and is far lower on compositional microbiome-metabolomics data (Section 3.3), and neither feature-level imputation nor unsupervised graph diffusion closes the gap under missingness (Section 3.4). The same pattern holds on a real cohort, where the patients DIABLO discards are disproportionately the most affected (Section 3.5). Tables 1 to 3 and Figures 1 to 3 summarize these results.
+WOVEN's defining property is that it scores every enrolled subject, retaining the entire cohort under block-missingness where the standard supervised method DIABLO must discard most of it (Section 3.1). It does so while recovering a markedly cleaner, better-separated latent space (Section 3.2), at no cost to discriminative accuracy: its balanced error rate matches or beats DIABLO in every condition and is far lower on compositional microbiome-metabolomics data (Section 3.3), and neither feature-level imputation nor unsupervised graph diffusion closes that gap under missingness (Section 3.4). The same pattern holds on a real cohort, where the patients DIABLO discards are disproportionately the most affected (Section 3.5). Tables 1 to 3 and Figures 1 to 3 summarize these results.
 
 ### 3.1 WOVEN Scores Every Subject Under Block-Missingness
 
-The defining consequence of WOVEN's design is subject retention. At a 50% MCAR block-missing rate, DIABLO retains only 19% of subjects by enforcing its intersection constraint, whereas WOVEN scores 100% of subjects in every arm and condition (Table 1). MOFA+ also reaches an effective sample size of 1.00, through variational Bayes inference that skips missing entries; what distinguishes WOVEN is that it retains the full cohort within a supervised objective, which produces the class-structured latent space and usable classification described next. Retention is the prerequisite; the following sections establish that it comes at no cost to the quality of the embedding or to classification accuracy.
+The defining consequence of WOVEN's design is subject retention. At a 50% MCAR block-missing rate, DIABLO retains only 19% of subjects by enforcing its intersection constraint, whereas WOVEN scores 100% of subjects in every arm and condition (Table 1). MOFA+ also reaches an effective sample size of 1.00, through variational Bayes inference that skips missing entries; what distinguishes WOVEN is that it retains the full cohort within a supervised objective, which produces the class-structured latent space and usable classification examined in the next two sections.
 
 ### 3.2 WOVEN Recovers a Cleaner, Class-Structured Latent Space
 
@@ -141,7 +141,7 @@ Does the cleaner, fuller latent space classify better? On complete data WOVEN's 
 
 Under block-missingness this advantage persists. BER at 50% MCAR is 0.398 for WOVEN versus 0.571 for DIABLO, again driven by ARM D (0.113 vs 0.777; Table 2), and structured MAR gives comparable results (0.389 vs 0.572), so the advantage is not specific to the missingness mechanism.
 
-WOVEN is also fast. On complete data it runs in 3.2 to 12.6 seconds per replicate against 4.3 to 72.8 for DIABLO and 10.2 to 16.8 for MOFA+, a 5.8 to 6.8-fold speedup over DIABLO on the high-dimensional arms. It is faster still under missingness (down to 1.6 seconds per replicate), because the eigendecomposition scales as $O((V n_a)^3)$ in the anchor count and the anchor set shrinks; it remains 5 to 7-fold faster than DIABLO at 50% MCAR while scoring the full cohort rather than the complete-case subset.
+WOVEN is also the fastest method tested, running 5.8 to 6.8-fold faster than DIABLO on the high-dimensional arms and faster still under missingness, since its single eigendecomposition scales with the shrinking anchor count (Section 2.3).
 
 **Table 2.** Balanced error rate by simulation arm, on complete data and at 50% MCAR (per-fold DR refitting with LDA; four-class chance = 0.75). ImputeDIABLO applies only under missingness; IntegrAO is compared in Section 3.4.
 
