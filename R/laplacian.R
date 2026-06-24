@@ -13,9 +13,13 @@
 #' @param X numeric matrix, n x p.
 #' @param k integer, number of nearest neighbors (default 10)
 #' @param sigma numeric, RBF bandwidth. NULL = median heuristic over observed edges.
+#' @param kernel_matrix numeric matrix, n_obs x n_obs precomputed affinity (Gram)
+#'   matrix for the observed rows only. When provided, bypasses RBF k-NN entirely.
+#'   Rows correspond to \code{X[!block_missing_rows, ]} in order.
+#'   Used by the QIC quantum kernel extension (GRAMA-Quantum).
 #' @return sparse n_full x n_full symmetric combinatorial Laplacian (dgCMatrix).
 #' @keywords internal
-build_laplacian <- function(X, k = 10L, sigma = NULL) {
+build_laplacian <- function(X, k = 10L, sigma = NULL, kernel_matrix = NULL) {
     n_full <- nrow(X)
 
     # Identify block-missing rows (entire row NA) -- excluded, never imputed
@@ -24,35 +28,64 @@ build_laplacian <- function(X, k = 10L, sigma = NULL) {
     n_obs <- length(obs_idx)
 
     if (n_obs == 0L) stop("No observed rows in X -- cannot build Laplacian.")
-    k <- min(k, n_obs - 1L)
 
-    # Impute only within observed rows (feature-level NAs only)
-    X_obs <- na_impute_median(X[obs_idx, , drop = FALSE])
+    if (!is.null(kernel_matrix)) {
+        # --- Precomputed kernel path (GRAMA-Quantum or any external Gram matrix) ---
+        kernel_matrix <- as.matrix(kernel_matrix)
+        if (!identical(dim(kernel_matrix), c(n_obs, n_obs))) {
+            stop(sprintf(
+                "kernel_matrix must be %d x %d (n_obs x n_obs), got %d x %d",
+                n_obs, n_obs, nrow(kernel_matrix), ncol(kernel_matrix)
+            ))
+        }
+        # Symmetrize and clip to [0, 1]
+        W_obs <- (kernel_matrix + t(kernel_matrix)) / 2
+        W_obs <- pmin(pmax(W_obs, 0), 1)
 
-    # k-NN via kd-tree on observed subjects only
-    nn   <- RANN::nn2(X_obs, k = k + 1L)
-    idx  <- nn$nn.idx[,  -1L, drop = FALSE]   # n_obs x k
-    dsts <- nn$nn.dists[, -1L, drop = FALSE]  # n_obs x k
+        # Embed obs-space affinity into n_full x n_full sparse matrix
+        obs_i <- rep(obs_idx, times = n_obs)
+        obs_j <- rep(obs_idx, each  = n_obs)
+        w_vec <- as.vector(W_obs)
+        keep  <- w_vec > 0
+        W <- Matrix::sparseMatrix(
+            i    = obs_i[keep],
+            j    = obs_j[keep],
+            x    = w_vec[keep],
+            dims = c(n_full, n_full),
+            repr = "C"
+        )
+    } else {
+        # --- Default RBF k-NN path ---
+        k <- min(k, n_obs - 1L)
 
-    # RBF bandwidth: median heuristic over observed edges
-    if (is.null(sigma)) {
-        sigma <- stats::median(dsts[dsts > 0])
-        if (!is.finite(sigma) || sigma == 0) sigma <- 1.0
+        # Impute only within observed rows (feature-level NAs only)
+        X_obs <- na_impute_median(X[obs_idx, , drop = FALSE])
+
+        # k-NN via kd-tree on observed subjects only
+        nn   <- RANN::nn2(X_obs, k = k + 1L)
+        idx  <- nn$nn.idx[,  -1L, drop = FALSE]   # n_obs x k
+        dsts <- nn$nn.dists[, -1L, drop = FALSE]  # n_obs x k
+
+        # RBF bandwidth: median heuristic over observed edges
+        if (is.null(sigma)) {
+            sigma <- stats::median(dsts[dsts > 0])
+            if (!is.finite(sigma) || sigma == 0) sigma <- 1.0
+        }
+
+        # Build affinity in obs-space, embed into full n_full x n_full
+        from_f <- obs_idx[rep(seq_len(n_obs), times = k)]
+        to_f   <- obs_idx[as.vector(idx)]
+        w      <- exp(-(as.vector(dsts)^2) / sigma^2)
+
+        W <- Matrix::sparseMatrix(
+            i    = c(from_f, to_f),
+            j    = c(to_f, from_f),
+            x    = rep(w / 2, 2),
+            dims = c(n_full, n_full),
+            repr = "C"
+        )
+        W@x <- pmin(W@x, 1.0)
     }
-
-    # Build affinity in obs-space, embed into full n_full x n_full
-    from_f <- obs_idx[rep(seq_len(n_obs), times = k)]
-    to_f   <- obs_idx[as.vector(idx)]
-    w      <- exp(-(as.vector(dsts)^2) / sigma^2)
-
-    W <- Matrix::sparseMatrix(
-        i    = c(from_f, to_f),
-        j    = c(to_f, from_f),
-        x    = rep(w / 2, 2),
-        dims = c(n_full, n_full),
-        repr = "C"
-    )
-    W@x <- pmin(W@x, 1.0)
 
     d <- Matrix::rowSums(W)
     Matrix::Diagonal(x = d) - W
