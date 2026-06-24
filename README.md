@@ -44,6 +44,19 @@ woven_plot_vip(fit, modality = "RNA")
 woven_metrics(fit, woven_example$Y)
 ```
 
+## Documentation
+
+A full walkthrough — simulating block-missing multi-omics data, fitting
+WOVEN, projecting incomplete subjects, and interpreting loadings — is in the
+package vignette:
+
+```r
+vignette("woven-intro", package = "woven")
+```
+
+See `?woven` for the main entry point and `?woven_predict`,
+`?woven_metrics`, `?woven_plot_vip` for the supporting functions.
+
 ## Benchmark results (400 simulation reps × 4 arms)
 
 | Condition | Method | Silhouette | NMI | ESS | BER |
