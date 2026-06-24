@@ -8,9 +8,11 @@
     }
     k <- min(k, nrow(X), ncol(X))
     sv <- svd(X, nu = k, nv = k)
-    list(u = sv$u[, seq_len(k), drop = FALSE],
-         d = sv$d[seq_len(k)],
-         v = sv$v[, seq_len(k), drop = FALSE])
+    list(
+        u = sv$u[, seq_len(k), drop = FALSE],
+        d = sv$d[seq_len(k)],
+        v = sv$v[, seq_len(k), drop = FALSE]
+    )
 }
 
 .eigs_sym_safe <- function(B, k) {
@@ -18,8 +20,10 @@
         return(RSpectra::eigs_sym(B, k = k, which = "LM"))
     }
     eig <- eigen(B, symmetric = TRUE)
-    list(values  = eig$values[seq_len(k)],
-         vectors = eig$vectors[, seq_len(k), drop = FALSE])
+    list(
+        values = eig$values[seq_len(k)],
+        vectors = eig$vectors[, seq_len(k), drop = FALSE]
+    )
 }
 
 #' Compute regularized B matrix: B_v = X^T X + lambda * Omega

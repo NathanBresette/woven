@@ -272,7 +272,7 @@ woven_nystrom_error <- function(fit, X_list, n_loo = NULL, sigma_proj = NULL) {
     V <- length(fit$W_list)
 
     errors <- vapply(loo_set, function(j) {
-        held_out  <- anchor_idx[j]
+        held_out <- anchor_idx[j]
         remain_idx <- anchor_idx[-j]
 
         # True score from full fit
@@ -280,21 +280,28 @@ woven_nystrom_error <- function(fit, X_list, n_loo = NULL, sigma_proj = NULL) {
 
         # LOO fit without this anchor
         X_loo <- lapply(X_list, function(X) {
-            Xi <- X; Xi[held_out, ] <- NA_real_; Xi
+            Xi <- X
+            Xi[held_out, ] <- NA_real_
+            Xi
         })
         mini <- tryCatch(
-            woven_mcca_dual(X_loo, anchor_idx = remain_idx,
-                            Y = as.integer(as.factor(fit$Y_anchor[-j])),
-                            K = fit$K, lambdas = fit$lambdas,
-                            gamma_y = fit$gamma_y, verbose = FALSE),
+            woven_mcca_dual(X_loo,
+                anchor_idx = remain_idx,
+                Y = as.integer(as.factor(fit$Y_anchor[-j])),
+                K = fit$K, lambdas = fit$lambdas,
+                gamma_y = fit$gamma_y, verbose = FALSE
+            ),
             error = function(e) NULL
         )
-        if (is.null(mini)) return(NA_real_)
+        if (is.null(mini)) {
+            return(NA_real_)
+        }
 
         # Direct W projection of held-out subject
         Xh <- lapply(seq_len(V), function(v) X_list[[v]][held_out, , drop = FALSE])
-        Z_proj <- Reduce("+", lapply(seq_len(V), function(v)
-            Xh[[v]] %*% mini$W_list[[v]])) / V
+        Z_proj <- Reduce("+", lapply(seq_len(V), function(v) {
+            Xh[[v]] %*% mini$W_list[[v]]
+        })) / V
 
         sqrt(sum((Z_proj - Z_true)^2))
     }, numeric(1L))
@@ -372,7 +379,8 @@ woven_all_metrics <- function(Z, labels, n_total,
 #' @return named numeric vector of metric values, printed as a tidy table
 #' @examples
 #' set.seed(1)
-#' n <- 40; K <- 2L
+#' n <- 40
+#' K <- 2L
 #' X1 <- matrix(rnorm(n * 8), n, 8)
 #' X2 <- matrix(rnorm(n * 6), n, 6)
 #' Y <- rep(1:2, each = n / 2)

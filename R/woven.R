@@ -21,31 +21,36 @@
 #'   to the \code{precomp} argument of [woven()].
 #' @examples
 #' set.seed(1)
-#' n <- 40; K <- 2L
+#' n <- 40
+#' K <- 2L
 #' X1 <- matrix(rnorm(n * 8), n, 8)
 #' X2 <- matrix(rnorm(n * 6), n, 6)
 #' Y <- rep(1:2, each = n / 2)
 #' miss <- matrix(runif(n * 2) < 0.3, n, 2)
 #' for (i in which(rowSums(miss) == 2)) miss[i, sample(2, 1)] <- FALSE
-#' X1[miss[, 1], ] <- NA; X2[miss[, 2], ] <- NA
+#' X1[miss[, 1], ] <- NA
+#' X2[miss[, 2], ] <- NA
 #' precomp <- woven_precompute(list(X1, X2), k_nn = 10L)
 #' fit <- woven(list(X1, X2), Y = Y, K = K, precomp = precomp)
 #' @seealso [woven()]
 #' @export
 woven_precompute <- function(X_list, k_nn = 10L) {
-    if (!is.list(X_list))
+    if (!is.list(X_list)) {
         stop("X_list must be a list of matrices.")
-    V     <- length(X_list)
+    }
+    V <- length(X_list)
     max_p <- max(vapply(X_list, ncol, integer(1L)))
     # Parallelize V Laplacians when p > 500: fork overhead (~200ms) is
     # negligible vs build time for high-dim omics data, and V tasks are independent.
     # For small p (toy data, vignette examples), stay sequential.
-    cores <- if (V > 1L && max_p > 500L)
+    cores <- if (V > 1L && max_p > 500L) {
         min(V, parallel::detectCores(logical = FALSE))
-    else
+    } else {
         1L
+    }
     parallel::mclapply(X_list, function(X) build_laplacian(X, k = k_nn),
-                       mc.cores = cores)
+        mc.cores = cores
+    )
 }
 
 #' Fit a supervised WOVEN model
@@ -92,7 +97,10 @@ woven_precompute <- function(X_list, k_nn = 10L) {
 #'
 #' @examples
 #' set.seed(1)
-#' n <- 60; p1 <- 20; p2 <- 15; K <- 2
+#' n <- 60
+#' p1 <- 20
+#' p2 <- 15
+#' K <- 2
 #' Y <- rep(1:2, each = n / 2)
 #' X1 <- matrix(rnorm(n * p1), n, p1)
 #' X2 <- matrix(rnorm(n * p2), n, p2)
@@ -115,17 +123,20 @@ woven <- function(X_list, Y, anchor_idx = NULL,
                   precomp = NULL,
                   verbose = TRUE) {
     #  Input validation
-    if (!is.list(X_list))
+    if (!is.list(X_list)) {
         stop("X_list must be a list of matrices, e.g. list(RNA = X_rna, Methyl = X_meth).")
+    }
     V <- length(X_list)
-    if (V < 2L)
+    if (V < 2L) {
         stop(sprintf("X_list must contain at least 2 modalities; got %d.", V))
+    }
     for (v in seq_len(V)) {
-        if (!is.matrix(X_list[[v]]))
+        if (!is.matrix(X_list[[v]])) {
             stop(sprintf(
                 "X_list[[%d]] is not a matrix (got %s). Convert with as.matrix().",
                 v, class(X_list[[v]])[1L]
             ))
+        }
     }
     n_rows <- vapply(X_list, nrow, integer(1L))
     if (length(unique(n_rows)) > 1L) {
@@ -136,13 +147,15 @@ woven <- function(X_list, Y, anchor_idx = NULL,
         ))
     }
     n <- n_rows[1L]
-    if (length(Y) != n)
+    if (length(Y) != n) {
         stop(sprintf(
             "length(Y) = %d but nrow(X_list[[1]]) = %d. Y must have one label per subject.",
             length(Y), n
         ))
-    if (anyNA(Y))
+    }
+    if (anyNA(Y)) {
         stop("Y contains NA values. Every subject must have a class label.")
+    }
     if (K < 1L) stop("K must be >= 1.")
     if (K >= n) stop(sprintf("K=%d must be less than n=%d.", K, n))
 
@@ -152,31 +165,35 @@ woven <- function(X_list, Y, anchor_idx = NULL,
             apply(X, 1L, function(row) all(is.na(row)))
         }, logical(n))
         anchor_idx <- which(rowSums(block_missing) == 0L)
-        if (verbose) message(sprintf(
-            "Auto-detected %d anchor subjects (%.0f%% of n=%d with all modalities observed).",
-            length(anchor_idx), 100 * length(anchor_idx) / n, n
-        ))
-        if (length(anchor_idx) == 0L)
+        if (verbose) {
+            message(sprintf(
+                "Auto-detected %d anchor subjects (%.0f%% of n=%d with all modalities observed).",
+                length(anchor_idx), 100 * length(anchor_idx) / n, n
+            ))
+        }
+        if (length(anchor_idx) == 0L) {
             stop("No fully-observed subjects found. Every subject is block-missing in at least one modality.")
+        }
     }
 
     if (length(anchor_idx) < K) {
         stop(sprintf("Need at least K=%d anchor subjects; got %d.", K, length(anchor_idx)))
     }
 
-    Y_fct    <- as.factor(Y)
-    Y_labels <- levels(Y_fct)   # original label names e.g. "CN","MCI","Dementia"
-    Y        <- as.integer(Y_fct)
+    Y_fct <- as.factor(Y)
+    Y_labels <- levels(Y_fct) # original label names e.g. "CN","MCI","Dementia"
+    Y <- as.integer(Y_fct)
 
     if (length(lambdas) == 1L) lambdas <- rep(lambdas, V)
     stopifnot(length(lambdas) == V)
 
     #  Extract anchor Laplacian submatrices from precomp if supplied
     La_list_precomp <- if (!is.null(precomp)) {
-        if (!is.list(precomp) || length(precomp) != V)
+        if (!is.list(precomp) || length(precomp) != V) {
             stop(sprintf(
                 "precomp must be the output of woven_precompute() -- a list of %d Laplacians.", V
             ))
+        }
         lapply(precomp, function(L) as.matrix(L[anchor_idx, anchor_idx, drop = FALSE]))
     } else {
         NULL
@@ -195,14 +212,17 @@ woven <- function(X_list, Y, anchor_idx = NULL,
         La_list_precomp = La_list_precomp,
         verbose         = verbose
     )
-    W_list    <- raw$W_list
+    W_list <- raw$W_list
     Z_anchors <- raw$Za_list
-    svals     <- raw$singular_values
-    fit_mcca  <- raw
+    svals <- raw$singular_values
+    fit_mcca <- raw
 
     #  Propagate feature names and modality names onto W_list
-    mod_names <- if (!is.null(names(X_list))) names(X_list) else
+    mod_names <- if (!is.null(names(X_list))) {
+        names(X_list)
+    } else {
         paste0("Modality ", seq_len(V))
+    }
     for (v in seq_len(V)) {
         rownames(W_list[[v]]) <- colnames(X_list[[v]])
     }
@@ -211,10 +231,10 @@ woven <- function(X_list, Y, anchor_idx = NULL,
     #  Compute consensus Z for all n subjects via vectorised BLAS projection
     if (verbose) message("  Projecting all subjects...")
     t_proj <- proc.time()
-    Z_acc   <- matrix(0,       n, K)
+    Z_acc <- matrix(0, n, K)
     obs_cnt <- integer(n)
     for (v in seq_len(V)) {
-        Xv  <- X_list[[v]]
+        Xv <- X_list[[v]]
         obs <- which(!apply(Xv, 1L, function(r) all(is.na(r))))
         if (length(obs) == 0L) next
         Xv_obs <- Xv[obs, , drop = FALSE]
@@ -228,7 +248,7 @@ woven <- function(X_list, Y, anchor_idx = NULL,
     Z_all[none, ] <- NA_real_
     dimnames(Z_all) <- list(rownames(X_list[[1]]), paste0("Dim", seq_len(K)))
     if (verbose) {
-        elapsed  <- round((proc.time() - t_proj)["elapsed"], 1)
+        elapsed <- round((proc.time() - t_proj)["elapsed"], 1)
         n_scored <- sum(!none)
         message(sprintf(
             "  Done. %d / %d subjects scored (%.0f%% ESS) in %.1fs.",
@@ -314,8 +334,11 @@ print.woven <- function(x, ...) {
     if (!is.null(x$mod_names)) {
         cat(sprintf("  Modalities : %s\n", paste(x$mod_names, collapse = ", ")))
     }
-    first_mod <- if (!is.null(x$mod_names))
-        sprintf('"%s"', x$mod_names[1L]) else "1"
+    first_mod <- if (!is.null(x$mod_names)) {
+        sprintf('"%s"', x$mod_names[1L])
+    } else {
+        "1"
+    }
     cat("\n")
     cat("  -- Next steps --\n")
     cat("  plot(fit, labels = Y)                         # latent space scatter\n")
@@ -345,18 +368,29 @@ print.woven <- function(x, ...) {
 #' fit <- woven(woven_example$X_complete, Y = woven_example$Y, K = 3L)
 #' summary(fit, labels = woven_example$Y)
 summary.woven <- function(object, labels = NULL, ...) {
-    cat(sprintf("WOVEN fit  [V=%d  K=%d  n=%d]\n",
-        length(object$W_list), object$K, object$n))
-    cat(sprintf("  Modalities : %s\n",
-        paste(object$mod_names %||% seq_along(object$W_list), collapse = ", ")))
-    cat(sprintf("  Classes    : %s\n",
-        paste(object$Y_labels %||% "unknown", collapse = ", ")))
+    cat(sprintf(
+        "WOVEN fit  [V=%d  K=%d  n=%d]\n",
+        length(object$W_list), object$K, object$n
+    ))
+    cat(sprintf(
+        "  Modalities : %s\n",
+        paste(object$mod_names %||% seq_along(object$W_list), collapse = ", ")
+    ))
+    cat(sprintf(
+        "  Classes    : %s\n",
+        paste(object$Y_labels %||% "unknown", collapse = ", ")
+    ))
     n_scored <- sum(!is.na(object$Z[, 1L]))
-    cat(sprintf("  Scored     : %d / %d  (ESS = %.2f)\n",
-        n_scored, object$n, n_scored / object$n))
-    cat(sprintf("  Singular values: %s\n",
+    cat(sprintf(
+        "  Scored     : %d / %d  (ESS = %.2f)\n",
+        n_scored, object$n, n_scored / object$n
+    ))
+    cat(sprintf(
+        "  Singular values: %s\n",
         paste(round(object$singular_values[seq_len(min(5L, object$K))], 3),
-              collapse = ", ")))
+            collapse = ", "
+        )
+    ))
     if (!is.null(labels)) {
         m <- woven_metrics(object, labels)
         cat(sprintf("\n  Silhouette : %6.3f\n", m["Silhouette"]))
@@ -391,7 +425,8 @@ summary.woven <- function(object, labels = NULL, ...) {
 #' @return a ggplot object, invisibly. The plot is printed as a side effect.
 #' @examples
 #' set.seed(1)
-#' n <- 20; K <- 2L
+#' n <- 20
+#' K <- 2L
 #' X1 <- matrix(rnorm(n * 5), n, 5)
 #' X2 <- matrix(rnorm(n * 4), n, 4)
 #' Y <- rep(1:2, each = n / 2)
@@ -411,13 +446,14 @@ plot.woven <- function(x, labels = NULL, dims = c(1L, 2L),
     if (is.null(Z)) stop("fit$Z is NULL. Refit with woven().")
     d1 <- dims[1L]
     d2 <- dims[2L]
-    if (d1 > x$K || d2 > x$K)
+    if (d1 > x$K || d2 > x$K) {
         stop(sprintf("dims out of range: fit has K=%d dimensions.", x$K))
+    }
 
     is_anchor <- seq_len(x$n) %in% x$anchor_idx
     df <- data.frame(
-        z1         = Z[, d1],
-        z2         = Z[, d2],
+        z1 = Z[, d1],
+        z2 = Z[, d2],
         point_type = ifelse(is_anchor, "Anchor", "Projected"),
         stringsAsFactors = FALSE
     )
@@ -427,28 +463,34 @@ plot.woven <- function(x, labels = NULL, dims = c(1L, 2L),
     df <- df[!is.na(df$z1), , drop = FALSE]
 
     n_groups <- length(levels(df$group))
-    pal_use  <- .pal_woven[seq_len(n_groups)]
+    pal_use <- .pal_woven[seq_len(n_groups)]
 
-    df_anchor    <- df[df$point_type == "Anchor", , drop = FALSE]
+    df_anchor <- df[df$point_type == "Anchor", , drop = FALSE]
     df_projected <- df[df$point_type == "Projected", , drop = FALSE]
 
     p_out <- ggplot2::ggplot(df, ggplot2::aes(x = z1, y = z2, color = group))
 
     if (highlight_anchors && nrow(df_projected) > 0L) {
         p_out <- p_out +
-            ggplot2::geom_point(data = df_projected,
-                       size = 1.4, alpha = 0.35, shape = 16L)
+            ggplot2::geom_point(
+                data = df_projected,
+                size = 1.4, alpha = 0.35, shape = 16L
+            )
     }
 
     p_out <- p_out +
-        ggplot2::geom_point(data = df_anchor,
-                   size = 2.8, alpha = 0.9, shape = 16L)
+        ggplot2::geom_point(
+            data = df_anchor,
+            size = 2.8, alpha = 0.9, shape = 16L
+        )
 
     if (!is.null(labels) && nrow(df_anchor) >= 4L) {
         p_out <- p_out +
-            ggplot2::stat_ellipse(data = df_anchor,
-                         type = "norm", level = 0.68,
-                         linewidth = 0.8, linetype = "dashed", alpha = 0.7)
+            ggplot2::stat_ellipse(
+                data = df_anchor,
+                type = "norm", level = 0.68,
+                linewidth = 0.8, linetype = "dashed", alpha = 0.7
+            )
     }
 
     if (!is.null(labels)) {
@@ -460,24 +502,31 @@ plot.woven <- function(x, labels = NULL, dims = c(1L, 2L),
             ggplot2::guides(color = "none")
     }
 
-    n_scored   <- sum(!is.na(x$Z[, 1L]))
-    n_anchor   <- length(x$anchor_idx)
-    n_proj     <- n_scored - n_anchor
-    ess_pct    <- round(100 * n_scored / x$n)
+    n_scored <- sum(!is.na(x$Z[, 1L]))
+    n_anchor <- length(x$anchor_idx)
+    n_proj <- n_scored - n_anchor
+    ess_pct <- round(100 * n_scored / x$n)
 
-    anchor_note <- if (highlight_anchors && n_proj > 0L)
+    anchor_note <- if (highlight_anchors && n_proj > 0L) {
         sprintf("solid = %d anchors, faded = %d projected", n_anchor, n_proj)
-    else NULL
+    } else {
+        NULL
+    }
 
     p_out <- p_out +
         ggplot2::labs(
-            x        = sprintf("WOVEN Dimension %d", d1),
-            y        = sprintf("WOVEN Dimension %d", d2),
-            title    = "WOVEN Latent Space",
-            subtitle = sprintf("%d / %d subjects scored (%d%% ESS)%s",
-                               n_scored, x$n, ess_pct,
-                               if (!is.null(anchor_note))
-                                   paste0("  |  ", anchor_note) else "")
+            x = sprintf("WOVEN Dimension %d", d1),
+            y = sprintf("WOVEN Dimension %d", d2),
+            title = "WOVEN Latent Space",
+            subtitle = sprintf(
+                "%d / %d subjects scored (%d%% ESS)%s",
+                n_scored, x$n, ess_pct,
+                if (!is.null(anchor_note)) {
+                    paste0("  |  ", anchor_note)
+                } else {
+                    ""
+                }
+            )
         ) +
         .theme_woven() +
         ggplot2::theme(legend.position = "right")
@@ -504,13 +553,15 @@ plot.woven <- function(x, labels = NULL, dims = c(1L, 2L),
 #'   Subjects with no observed data in any view receive a row of NA.
 #' @examples
 #' set.seed(1)
-#' n <- 30; K <- 2L
+#' n <- 30
+#' K <- 2L
 #' X1 <- matrix(rnorm(n * 8), n, 8)
 #' X2 <- matrix(rnorm(n * 6), n, 6)
 #' Y <- rep(1:2, each = n / 2)
 #' miss <- matrix(runif(n * 2) < 0.3, n, 2)
 #' for (i in which(rowSums(miss) == 2)) miss[i, sample(2, 1)] <- FALSE
-#' X1[miss[, 1], ] <- NA; X2[miss[, 2], ] <- NA
+#' X1[miss[, 1], ] <- NA
+#' X2[miss[, 2], ] <- NA
 #' fit <- woven(list(X1, X2), Y = Y, K = K)
 #' Z_new <- woven_scores(fit, list(X1[1:5, ], X2[1:5, ]))
 #' dim(Z_new)
@@ -518,31 +569,36 @@ plot.woven <- function(x, labels = NULL, dims = c(1L, 2L),
 #' @export
 woven_scores <- function(fit, X_list_new) {
     stopifnot(inherits(fit, "woven"))
-    if (!is.list(X_list_new) || length(X_list_new) != fit$V)
+    if (!is.list(X_list_new) || length(X_list_new) != fit$V) {
         stop(sprintf(
             "X_list_new must be a list of %d matrices (one per modality).", fit$V
         ))
+    }
     for (v in seq_len(fit$V)) {
-        p_new  <- ncol(X_list_new[[v]])
-        p_fit  <- nrow(fit$W_list[[v]])
-        nm     <- if (!is.null(fit$mod_names)) fit$mod_names[v] else
+        p_new <- ncol(X_list_new[[v]])
+        p_fit <- nrow(fit$W_list[[v]])
+        nm <- if (!is.null(fit$mod_names)) {
+            fit$mod_names[v]
+        } else {
             paste0("modality ", v)
-        if (p_new != p_fit)
+        }
+        if (p_new != p_fit) {
             stop(sprintf(
                 "X_list_new[[%d]] (%s) has %d features but model was trained on %d.",
                 v, nm, p_new, p_fit
             ))
+        }
     }
 
-    n_new   <- nrow(X_list_new[[1]])
-    K       <- fit$K
-    V       <- fit$V
-    rn      <- rownames(X_list_new[[1]])
+    n_new <- nrow(X_list_new[[1]])
+    K <- fit$K
+    V <- fit$V
+    rn <- rownames(X_list_new[[1]])
 
-    Z_acc   <- matrix(0, n_new, K)
+    Z_acc <- matrix(0, n_new, K)
     obs_cnt <- integer(n_new)
     for (v in seq_len(V)) {
-        Xv  <- X_list_new[[v]]
+        Xv <- X_list_new[[v]]
         obs <- which(!apply(Xv, 1L, function(r) all(is.na(r))))
         if (length(obs) == 0L) next
         Xv_obs <- Xv[obs, , drop = FALSE]
@@ -594,19 +650,21 @@ woven_scores <- function(fit, X_list_new) {
 #' @export
 woven_predict <- function(fit, X_list_new, method = "centroid", k_pred = 5L) {
     stopifnot(inherits(fit, "woven"))
-    if (!is.list(X_list_new) || length(X_list_new) != fit$V)
+    if (!is.list(X_list_new) || length(X_list_new) != fit$V) {
         stop(sprintf(
             "X_list_new must be a list of %d matrices (one per modality).", fit$V
         ))
+    }
     for (v in seq_len(fit$V)) {
         p_new <- ncol(X_list_new[[v]])
         p_fit <- nrow(fit$W_list[[v]])
-        nm    <- if (!is.null(fit$mod_names)) fit$mod_names[v] else paste0("modality ", v)
-        if (p_new != p_fit)
+        nm <- if (!is.null(fit$mod_names)) fit$mod_names[v] else paste0("modality ", v)
+        if (p_new != p_fit) {
             stop(sprintf(
                 "X_list_new[[%d]] (%s) has %d features but model was trained on %d.",
                 v, nm, p_new, p_fit
             ))
+        }
     }
     pred_rownames <- rownames(X_list_new[[1L]])
 
@@ -659,17 +717,19 @@ woven_predict <- function(fit, X_list_new, method = "centroid", k_pred = 5L) {
     probs <- do.call(rbind, lapply(seq_len(n_new), function(i) classify_row(Z_new[i, ])))
 
     # Use original label names if available (e.g. "CN","MCI","Dementia")
-    display_labels <- if (!is.null(fit$Y_labels)) fit$Y_labels else
+    display_labels <- if (!is.null(fit$Y_labels)) {
+        fit$Y_labels
+    } else {
         as.character(levels_Y)
+    }
     colnames(probs) <- paste0("p_", display_labels)
     pred_idx <- apply(probs, 1, which.max)
 
     data.frame(
         predicted_class = display_labels[pred_idx],
-        confidence      = probs[cbind(seq_len(n_new), pred_idx)],
+        confidence = probs[cbind(seq_len(n_new), pred_idx)],
         as.data.frame(probs),
-        row.names       = pred_rownames,
+        row.names = pred_rownames,
         stringsAsFactors = FALSE
     )
 }
-

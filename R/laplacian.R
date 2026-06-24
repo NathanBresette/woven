@@ -44,9 +44,9 @@ build_laplacian <- function(X, k = 10L, sigma = NULL, kernel_matrix = NULL) {
 
         # Embed obs-space affinity into n_full x n_full sparse matrix
         obs_i <- rep(obs_idx, times = n_obs)
-        obs_j <- rep(obs_idx, each  = n_obs)
+        obs_j <- rep(obs_idx, each = n_obs)
         w_vec <- as.vector(W_obs)
-        keep  <- w_vec > 0
+        keep <- w_vec > 0
         W <- Matrix::sparseMatrix(
             i    = obs_i[keep],
             j    = obs_j[keep],
@@ -62,9 +62,9 @@ build_laplacian <- function(X, k = 10L, sigma = NULL, kernel_matrix = NULL) {
         X_obs <- na_impute_median(X[obs_idx, , drop = FALSE])
 
         # k-NN via kd-tree on observed subjects only
-        nn   <- RANN::nn2(X_obs, k = k + 1L)
-        idx  <- nn$nn.idx[,  -1L, drop = FALSE]   # n_obs x k
-        dsts <- nn$nn.dists[, -1L, drop = FALSE]  # n_obs x k
+        nn <- RANN::nn2(X_obs, k = k + 1L)
+        idx <- nn$nn.idx[, -1L, drop = FALSE] # n_obs x k
+        dsts <- nn$nn.dists[, -1L, drop = FALSE] # n_obs x k
 
         # RBF bandwidth: median heuristic over observed edges
         if (is.null(sigma)) {
@@ -74,8 +74,8 @@ build_laplacian <- function(X, k = 10L, sigma = NULL, kernel_matrix = NULL) {
 
         # Build affinity in obs-space, embed into full n_full x n_full
         from_f <- obs_idx[rep(seq_len(n_obs), times = k)]
-        to_f   <- obs_idx[as.vector(idx)]
-        w      <- exp(-(as.vector(dsts)^2) / sigma^2)
+        to_f <- obs_idx[as.vector(idx)]
+        w <- exp(-(as.vector(dsts)^2) / sigma^2)
 
         W <- Matrix::sparseMatrix(
             i    = c(from_f, to_f),
