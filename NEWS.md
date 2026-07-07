@@ -1,3 +1,11 @@
+# woven 0.99.1
+
+* `woven()` now standardizes each modality to zero mean and unit variance by
+  default (`scale = TRUE`), matching the internal scaling of comparator methods
+  so that no modality dominates by measurement scale. Stored centers and scales
+  are reapplied to new subjects in `woven_scores()` and `woven_predict()`. Set
+  `scale = FALSE` to retain the previous raw-feature behavior.
+
 # woven 0.99.0
 
 * Initial Bioconductor submission.
