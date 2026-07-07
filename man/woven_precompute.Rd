@@ -4,13 +4,16 @@
 \alias{woven_precompute}
 \title{Pre-compute Laplacian graphs for reuse across multiple woven() calls}
 \usage{
-woven_precompute(X_list, k_nn = 10L)
+woven_precompute(X_list, k_nn = 10L, scale = TRUE)
 }
 \arguments{
 \item{X_list}{list of V matrices (n x p_v). Block-missing rows (all NA)
 are automatically excluded from the k-NN graph.}
 
 \item{k_nn}{integer, number of nearest neighbours (default 10)}
+
+\item{scale}{logical, standardize features to unit variance before building
+Laplacians (default TRUE); use the same value passed to [woven()].}
 }
 \value{
 list of V sparse Laplacian matrices, one per modality. Pass directly
@@ -24,13 +27,15 @@ cross-validation, or sensitivity analysis.
 }
 \examples{
 set.seed(1)
-n <- 40; K <- 2L
+n <- 40
+K <- 2L
 X1 <- matrix(rnorm(n * 8), n, 8)
 X2 <- matrix(rnorm(n * 6), n, 6)
 Y <- rep(1:2, each = n / 2)
 miss <- matrix(runif(n * 2) < 0.3, n, 2)
 for (i in which(rowSums(miss) == 2)) miss[i, sample(2, 1)] <- FALSE
-X1[miss[, 1], ] <- NA; X2[miss[, 2], ] <- NA
+X1[miss[, 1], ] <- NA
+X2[miss[, 2], ] <- NA
 precomp <- woven_precompute(list(X1, X2), k_nn = 10L)
 fit <- woven(list(X1, X2), Y = Y, K = K, precomp = precomp)
 }

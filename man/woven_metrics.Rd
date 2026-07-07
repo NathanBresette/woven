@@ -24,7 +24,8 @@ NMI, and ESS retention as a named numeric vector.
 }
 \examples{
 set.seed(1)
-n <- 40; K <- 2L
+n <- 40
+K <- 2L
 X1 <- matrix(rnorm(n * 8), n, 8)
 X2 <- matrix(rnorm(n * 6), n, 6)
 Y <- rep(1:2, each = n / 2)

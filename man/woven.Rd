@@ -12,6 +12,7 @@ woven(
   lambdas = 0.1,
   gamma_y = 1,
   k_nn = 10L,
+  scale = TRUE,
   precomp = NULL,
   verbose = TRUE
 )
@@ -36,7 +37,12 @@ strength per modality (default 0.1 for all)}
 Default 1.0 (equal weight to cross-modal alignment and label alignment).
 Tune via cross-validation on anchor set if labels are noisy.}
 
-\item{k_nn}{integer  -- k-nearest-neighbors for Laplacian graph (default 10).
+\item{k_nn}{integer  -- k-nearest-neighbors for Laplacian graph (default 10).}
+
+\item{scale}{logical  -- standardize each modality's features to zero mean and
+unit variance before fitting (default TRUE), matching DIABLO (scale=TRUE) and
+IntegrAO. Apply biological transforms (CLR/log/VST) upstream. The center and
+scale are stored and reapplied to new subjects in [woven_scores()].
 Ignored when \code{precomp} is supplied.}
 
 \item{precomp}{optional output of [woven_precompute()] -- pre-built Laplacians.
@@ -70,7 +76,10 @@ For V>=3, uses the ALS solver with label-kernel supervision.
 }
 \examples{
 set.seed(1)
-n <- 60; p1 <- 20; p2 <- 15; K <- 2
+n <- 60
+p1 <- 20
+p2 <- 15
+K <- 2
 Y <- rep(1:2, each = n / 2)
 X1 <- matrix(rnorm(n * p1), n, p1)
 X2 <- matrix(rnorm(n * p2), n, p2)

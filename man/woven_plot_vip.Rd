@@ -36,7 +36,10 @@ A dashed reference line at VIP = 1 marks above-average importance.
 }
 \examples{
 set.seed(1)
-n <- 60; p1 <- 30; p2 <- 20; K <- 3
+n <- 60
+p1 <- 30
+p2 <- 20
+K <- 3
 Y <- rep(1:3, each = n / 3)
 X1 <- matrix(rnorm(n * p1), n, p1)
 X2 <- matrix(rnorm(n * p2), n, p2)

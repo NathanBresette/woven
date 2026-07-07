@@ -32,7 +32,8 @@ open triangles. Returns a ggplot object that can be further customized with
 }
 \examples{
 set.seed(1)
-n <- 20; K <- 2L
+n <- 20
+K <- 2L
 X1 <- matrix(rnorm(n * 5), n, 5)
 X2 <- matrix(rnorm(n * 4), n, 4)
 Y <- rep(1:2, each = n / 2)

@@ -22,7 +22,10 @@ how much shared multi-omics signal is captured in the leading dimensions.
 }
 \examples{
 set.seed(1)
-n <- 60; p1 <- 30; p2 <- 20; K <- 4
+n <- 60
+p1 <- 30
+p2 <- 20
+K <- 4
 Y <- rep(1:2, each = n / 2)
 X1 <- matrix(rnorm(n * p1), n, p1)
 X2 <- matrix(rnorm(n * p2), n, p2)

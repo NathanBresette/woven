@@ -17,6 +17,8 @@
 #' @param X_list list of V matrices (n x p_v). Block-missing rows (all NA)
 #'   are automatically excluded from the k-NN graph.
 #' @param k_nn integer, number of nearest neighbours (default 10)
+#' @param scale logical, standardize features to unit variance before building
+#'   Laplacians (default TRUE); use the same value passed to [woven()].
 #' @return list of V sparse Laplacian matrices, one per modality. Pass directly
 #'   to the \code{precomp} argument of [woven()].
 #' @examples
@@ -34,10 +36,14 @@
 #' fit <- woven(list(X1, X2), Y = Y, K = K, precomp = precomp)
 #' @seealso [woven()]
 #' @export
-woven_precompute <- function(X_list, k_nn = 10L) {
+woven_precompute <- function(X_list, k_nn = 10L, scale = TRUE) {
     if (!is.list(X_list)) {
         stop("X_list must be a list of matrices.")
     }
+    # Match woven(scale=TRUE): build Laplacians on standardized features so the
+    # precomputed graph is consistent with the scaled fit. Deterministic, so the
+    # same X_list yields the same scaling inside woven().
+    if (isTRUE(scale)) X_list <- .scale_fit(X_list)$X
     V <- length(X_list)
     max_p <- max(vapply(X_list, ncol, integer(1L)))
     # Parallelize V Laplacians when p > 500: fork overhead (~200ms) is
@@ -76,6 +82,10 @@ woven_precompute <- function(X_list, k_nn = 10L) {
 #'   Default 1.0 (equal weight to cross-modal alignment and label alignment).
 #'   Tune via cross-validation on anchor set if labels are noisy.
 #' @param k_nn integer  -- k-nearest-neighbors for Laplacian graph (default 10).
+#' @param scale logical  -- standardize each modality's features to zero mean and
+#'   unit variance before fitting (default TRUE), matching DIABLO (scale=TRUE) and
+#'   IntegrAO. Apply biological transforms (CLR/log/VST) upstream. The center and
+#'   scale are stored and reapplied to new subjects in [woven_scores()].
 #'   Ignored when \code{precomp} is supplied.
 #' @param precomp optional output of [woven_precompute()] -- pre-built Laplacians.
 #'   Pass this when calling \code{woven()} multiple times on the same data (e.g.
@@ -120,6 +130,7 @@ woven <- function(X_list, Y, anchor_idx = NULL,
                   lambdas = 0.1,
                   gamma_y = 1.0,
                   k_nn = 10L,
+                  scale = TRUE,
                   precomp = NULL,
                   verbose = TRUE) {
     #  Input validation
@@ -186,6 +197,20 @@ woven <- function(X_list, Y, anchor_idx = NULL,
 
     if (length(lambdas) == 1L) lambdas <- rep(lambdas, V)
     stopifnot(length(lambdas) == V)
+
+    #  Standardize features to unit variance (matches DIABLO scale=TRUE and
+    #  IntegrAO). Users apply biological transforms (CLR/log/VST) upstream; this
+    #  ensures no modality dominates by measurement scale. Stored for out-of-
+    #  sample scaling in woven_scores(). Supply precomp from woven_precompute(
+    #  scale=TRUE) so its Laplacians match; the transform is deterministic.
+    scale_center <- NULL
+    scale_scale <- NULL
+    if (isTRUE(scale)) {
+        .sf <- .scale_fit(X_list)
+        X_list <- .sf$X
+        scale_center <- .sf$center
+        scale_scale <- .sf$scale
+    }
 
     #  Extract anchor Laplacian submatrices from precomp if supplied
     La_list_precomp <- if (!is.null(precomp)) {
@@ -274,6 +299,9 @@ woven <- function(X_list, Y, anchor_idx = NULL,
             lambdas         = lambdas,
             gamma_y         = gamma_y,
             k_nn            = k_nn,
+            scaled          = isTRUE(scale),
+            scale_center    = scale_center,
+            scale_scale     = scale_scale,
             fit_mcca        = fit_mcca
         ),
         class = "woven"
@@ -588,6 +616,11 @@ woven_scores <- function(fit, X_list_new) {
                 v, nm, p_new, p_fit
             ))
         }
+    }
+
+    #  Apply the same standardization used at fit time (scale=TRUE)
+    if (isTRUE(fit$scaled) && !is.null(fit$scale_center)) {
+        X_list_new <- .scale_apply(X_list_new, fit$scale_center, fit$scale_scale)
     }
 
     n_new <- nrow(X_list_new[[1]])

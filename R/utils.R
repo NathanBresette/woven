@@ -47,6 +47,35 @@ compute_B <- function(X, lambda, Omega, XtX_precomp = NULL) {
     as.matrix(XtX + lambda * Omega)
 }
 
+# Internal: standardize each modality's features to zero mean and unit variance
+# using observed-value statistics (matching DIABLO's scale=TRUE and IntegrAO's
+# normalization). Block-missing (all-NA) rows stay NA. Returns the standardized
+# X_list plus per-feature center/scale so out-of-sample subjects can be scaled
+# identically in woven_scores()/woven_predict().
+.scale_fit <- function(X_list) {
+    centers <- vector("list", length(X_list))
+    scales <- vector("list", length(X_list))
+    Xs <- lapply(seq_along(X_list), function(v) {
+        X <- X_list[[v]]
+        ctr <- colMeans(X, na.rm = TRUE)
+        scl <- apply(X, 2L, stats::sd, na.rm = TRUE)
+        ctr[!is.finite(ctr)] <- 0
+        scl[!is.finite(scl) | scl == 0] <- 1
+        centers[[v]] <<- ctr
+        scales[[v]] <<- scl
+        sweep(sweep(X, 2L, ctr, "-"), 2L, scl, "/")
+    })
+    names(Xs) <- names(X_list)
+    list(X = Xs, center = centers, scale = scales)
+}
+
+# Internal: apply stored center/scale (from .scale_fit) to new modality matrices.
+.scale_apply <- function(X_list, centers, scales) {
+    lapply(seq_along(X_list), function(v) {
+        sweep(sweep(X_list[[v]], 2L, centers[[v]], "-"), 2L, scales[[v]], "/")
+    })
+}
+
 # Internal: drop all-NA rows, impute feature-level NAs with column median
 na_impute_median <- function(X) {
     # Drop block-missing rows (all NA)
