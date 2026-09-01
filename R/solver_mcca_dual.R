@@ -40,6 +40,22 @@
 #' @param gamma_y numeric >= 0, label supervision strength
 #' @param k_nn integer, k-NN for Laplacian (ignored if La_list_precomp supplied)
 #' @param La_list_precomp optional list of pre-extracted n_a x n_a anchor Laplacians
+#' @param ridge_w numeric >= 0, relative ridge strength for the W recovery step
+#'   (Ka_reg = Ka_v + ridge_w * max(diag(Ka_v)) * I). Default 1e-8 is a pure
+#'   numerical-stability nudge (original behavior). Larger values shrink
+#'   W_v toward zero, trading anchor fit for reduced variance when p_v >> n_a
+#'   (v7 regularization; CV-selected like lambdas and gamma_y).
+#' @param screen_top integer or Inf, per-modality feature count for
+#'   univariate (ANOVA F-score vs Y) supervised pre-screening BEFORE the W
+#'   recovery step. Default Inf disables this (all features used, original
+#'   behavior). The eigendecomposition (Za_list) never depends on features --
+#'   only the Laplacians and label kernel -- so screening only changes the
+#'   W_v = X_a_v^T Ka_v^{-1} Za_v recovery: Ka_v = X_a_v X_a_v^T is built
+#'   from the screened columns only, which is a genuine re-fit of the
+#'   min-norm interpolation on a reduced feature set (not a post-hoc
+#'   truncation of an already-complete solution). Screened-out features get
+#'   an exact zero row in the returned W_v (same shape as unscreened, so
+#'   all downstream code -- project_all(), woven_scores() -- is unaffected).
 #' @param verbose logical
 #'
 #' @return list with W_list, Za_list, Xa_list, singular_values, and metadata.
@@ -62,6 +78,8 @@ woven_mcca_dual <- function(X_list, anchor_idx, Y,
                             gamma_y = 1.0,
                             k_nn = 10L,
                             La_list_precomp = NULL,
+                            ridge_w = 1e-8,
+                            screen_top = Inf,
                             verbose = TRUE) {
     V <- length(X_list)
     n <- nrow(X_list[[1]])
@@ -177,10 +195,44 @@ woven_mcca_dual <- function(X_list, anchor_idx, Y,
             Za_v_raw %*% ev2$vectors[, seq_len(K_use), drop = FALSE] %*% diag(d_inv, K_use)
         }
 
+        # ── Supervised univariate pre-screening (v7) ────────────────────────
+        # Selects which columns of Xa_list[[v]] enter the Gram matrix BELOW,
+        # before W is recovered -- a genuine re-fit of the min-norm
+        # interpolation on a reduced feature set (Ka_v = X_screened X_screened^T
+        # is a different matrix, not a truncation of the full-feature answer).
+        # Za_list above is unaffected (never depended on features). Scored by
+        # ANOVA F-statistic vs Y on anchor data only.
+        p_v <- ncol(Xa_list[[v]])
+        screen_idx <- seq_len(p_v)
+        if (is.finite(screen_top) && screen_top < p_v) {
+            Xv <- Xa_list[[v]]
+            y_f <- as.factor(Y_a)
+            grand_mean <- colMeans(Xv)
+            ss_between <- numeric(p_v)
+            ss_within  <- numeric(p_v)
+            for (lev in levels(y_f)) {
+                idx <- which(y_f == lev)
+                n_c <- length(idx)
+                if (n_c < 2L) next
+                Xc <- Xv[idx, , drop = FALSE]
+                mean_c <- colMeans(Xc)
+                ss_between <- ss_between + n_c * (mean_c - grand_mean)^2
+                ss_within  <- ss_within + colSums(sweep(Xc, 2, mean_c, "-")^2)
+            }
+            df_b <- nlevels(y_f) - 1L
+            df_w <- n_a - nlevels(y_f)
+            f_score <- (ss_between / max(df_b, 1L)) / (ss_within / max(df_w, 1L) + 1e-12)
+            f_score[!is.finite(f_score)] <- 0
+            screen_idx <- order(f_score, decreasing = TRUE)[seq_len(screen_top)]
+        }
+
         # W_v = X_a_v^T K_v^{-1} Za_v  (min-norm solution, p_v x K)
-        Ka_v <- tcrossprod(Xa_list[[v]])
-        Ka_reg <- Ka_v + diag(1e-8 * max(diag(Ka_v)), n_a)
-        W_list[[v]] <- t(Xa_list[[v]]) %*% tryCatch(
+        # Gram matrix built from screened columns only; unscreened rows of
+        # W_v stay exactly zero (same p_v x K shape either way).
+        Xa_screened <- Xa_list[[v]][, screen_idx, drop = FALSE]
+        Ka_v <- tcrossprod(Xa_screened)
+        Ka_reg <- Ka_v + diag(ridge_w * max(diag(Ka_v)), n_a)
+        W_screened <- t(Xa_screened) %*% tryCatch(
             solve(Ka_reg, Za_list[[v]]),
             error = function(e) {
                 sv <- svd(Ka_reg)
@@ -188,6 +240,9 @@ woven_mcca_dual <- function(X_list, anchor_idx, Y,
                     t(sv$u) %*% Za_list[[v]]
             }
         )
+        Wv_full <- matrix(0, p_v, K_use)
+        Wv_full[screen_idx, ] <- W_screened
+        W_list[[v]] <- Wv_full
     }
 
     if (verbose) {
