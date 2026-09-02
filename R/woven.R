@@ -82,6 +82,20 @@ woven_precompute <- function(X_list, k_nn = 10L, scale = TRUE) {
 #'   Default 1.0 (equal weight to cross-modal alignment and label alignment).
 #'   Tune via cross-validation on anchor set if labels are noisy.
 #' @param k_nn integer  -- k-nearest-neighbors for Laplacian graph (default 10).
+#' @param ridge_w numeric >= 0  -- ridge shrinkage applied to the per-modality
+#'   Gram matrix during projection-matrix (W) recovery (default 1e-8, a purely
+#'   numerical-stability nudge with no regularizing effect). Increase (e.g.
+#'   0.1-5.0) to control capacity when p_v >> n_a and the true signal is
+#'   diffuse across many features -- select via cross-validation on held-out
+#'   classification error, since silhouette is insensitive to this parameter
+#'   even where it materially changes classification accuracy.
+#' @param screen_top integer or Inf  -- restricts W recovery to the top
+#'   \code{screen_top} features per modality by ANOVA F-statistic against Y,
+#'   computed on anchor subjects only (default Inf = no screening, uses all
+#'   features). A genuine re-fit on the reduced feature set, not a post-hoc
+#'   truncation. Complementary to \code{ridge_w}; both target overfitting when
+#'   p_v is large relative to n_a. Select jointly with \code{ridge_w} via
+#'   cross-validation, not independently (the two interact).
 #' @param scale logical  -- standardize each modality's features to zero mean and
 #'   unit variance before fitting (default TRUE), matching DIABLO (scale=TRUE) and
 #'   IntegrAO. Apply biological transforms (CLR/log/VST) upstream. The center and
@@ -130,6 +144,8 @@ woven <- function(X_list, Y, anchor_idx = NULL,
                   lambdas = 0.1,
                   gamma_y = 1.0,
                   k_nn = 10L,
+                  ridge_w = 1e-8,
+                  screen_top = Inf,
                   scale = TRUE,
                   precomp = NULL,
                   verbose = TRUE) {
@@ -234,6 +250,8 @@ woven <- function(X_list, Y, anchor_idx = NULL,
         lambdas         = lambdas,
         gamma_y         = gamma_y,
         k_nn            = k_nn,
+        ridge_w         = ridge_w,
+        screen_top      = screen_top,
         La_list_precomp = La_list_precomp,
         verbose         = verbose
     )
@@ -299,6 +317,8 @@ woven <- function(X_list, Y, anchor_idx = NULL,
             lambdas         = lambdas,
             gamma_y         = gamma_y,
             k_nn            = k_nn,
+            ridge_w         = ridge_w,
+            screen_top      = screen_top,
             scaled          = isTRUE(scale),
             scale_center    = scale_center,
             scale_scale     = scale_scale,

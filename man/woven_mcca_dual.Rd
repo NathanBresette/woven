@@ -13,6 +13,8 @@ woven_mcca_dual(
   gamma_y = 1,
   k_nn = 10L,
   La_list_precomp = NULL,
+  ridge_w = 1e-08,
+  screen_top = Inf,
   verbose = TRUE
 )
 }
@@ -32,6 +34,24 @@ woven_mcca_dual(
 \item{k_nn}{integer, k-NN for Laplacian (ignored if La_list_precomp supplied)}
 
 \item{La_list_precomp}{optional list of pre-extracted n_a x n_a anchor Laplacians}
+
+\item{ridge_w}{numeric >= 0, relative ridge strength for the W recovery step
+(Ka_reg = Ka_v + ridge_w * max(diag(Ka_v)) * I). Default 1e-8 is a pure
+numerical-stability nudge (original behavior). Larger values shrink
+W_v toward zero, trading anchor fit for reduced variance when p_v >> n_a
+(v7 regularization; CV-selected like lambdas and gamma_y).}
+
+\item{screen_top}{integer or Inf, per-modality feature count for
+univariate (ANOVA F-score vs Y) supervised pre-screening BEFORE the W
+recovery step. Default Inf disables this (all features used, original
+behavior). The eigendecomposition (Za_list) never depends on features --
+only the Laplacians and label kernel -- so screening only changes the
+W_v = X_a_v^T Ka_v^{-1} Za_v recovery: Ka_v = X_a_v X_a_v^T is built
+from the screened columns only, which is a genuine re-fit of the
+min-norm interpolation on a reduced feature set (not a post-hoc
+truncation of an already-complete solution). Screened-out features get
+an exact zero row in the returned W_v (same shape as unscreened, so
+all downstream code -- project_all(), woven_scores() -- is unaffected).}
 
 \item{verbose}{logical}
 }
